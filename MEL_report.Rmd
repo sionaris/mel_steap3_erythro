@@ -1,0 +1,178 @@
+---
+title: "MEL differential expression analysis and more"
+author: "[Aristeidis Sionakidis](https://www.ed.ac.uk/profile/aristeidis-sionakidis), Aliki Papadimitriou"
+date: "`r Sys.Date()`"
+abstract: >
+  This markdown document contains all the code from the R scripts of this
+  repository. The code may be slightly modified so that the document has a
+  smooth, natural flow for the reader, but all results generated are identical.
+  The purpose of this markdown is to visualize the results, explain the
+  rationale behind all the preprocessing steps and main analysis steps we take,
+  and make it easy to go through our work and understand our approach. In the end
+  of the document we provide our `sessionInfo()` output for reproducibility.
+  This work focuses on the analysis of RNA-seq count data from MEL samples
+  which either underwent treatment with HMBA or not (controls). Samples are
+  sequenced in multiple timepoints. There are two batches (`2023_exp`, `auth`)
+  for which results are adjusted.
+output: 
+  html_document:
+    toc: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = FALSE, dev = "tiff", tidy = FALSE,
+                      message = FALSE, error = FALSE, warning = TRUE)
+```
+
+# Libraries
+```{r libraries}
+# Loading all libraries required for the workflow
+suppressWarnings(library(dplyr))
+suppressWarnings(library(DESeq2))
+suppressWarnings(library(edgeR))
+suppressWarnings(library(org.Mm.eg.db))
+suppressWarnings(library(biomaRt))
+suppressWarnings(library(ggplot2))
+suppressWarnings(library(tidyr))
+suppressWarnings(library(vsn))
+suppressWarnings(library(ggpubr))
+suppressWarnings(library(cowplot))
+suppressWarnings(library(pheatmap))
+suppressWarnings(library(rcartocolor))
+suppressWarnings(library(RColorBrewer))
+suppressWarnings(library(tibble))
+suppressWarnings(library(PoiClaClu))
+suppressWarnings(library(ggrepel))
+suppressWarnings(library(glmpca))
+suppressWarnings(library(openxlsx))
+suppressWarnings(library(EnhancedVolcano))
+suppressWarnings(library(genefilter))
+suppressWarnings(library(Matrix))
+```
+
+# Preprocessing: First steps
+## Loading and cleaning files
+All the files are in the subdirectory `Count_files/`. We first load all of their names and then read them all and combine them in a single object using the function`readDGE()` from the `edgeR` package.
+```{r loading}
+# Load the files into R
+files = list.files("Count_files/")
+x = readDGE(paste0("Count_files/", files), 
+            columns = c(1,2))
+```
+
+We first check the sample names, which are currently very long (full directory locations).
+```{r print_colnames_pre}
+# Print current column names of x (sample names)
+colnames(x)
+```
+We shorten the names to make them more readable and meaningful.
+
+```{r sample names}
+sample_names_prev = colnames(x)
+samplenames_almost = substring(sample_names_prev, nchar("Count_files/") + 1,
+                               nchar(sample_names_prev) - 7)
+
+# Add prefix to indicate batch
+samplenames = samplenames_almost
+for (i in 1:ncol(x)) {
+  if (i <= 8) {
+    samplenames[i] = paste0("2023_", samplenames[i])
+  } else {
+    samplenames[i] = paste0("AUTH_", samplenames[i])
+  }
+}
+
+colnames(x) = samplenames
+rm(sample_names_prev, samplenames_almost, i, samplenames)
+```
+The updated sample names look better:
+```{r updated_sample_names}
+colnames(x)
+```
+As mentioned in the abstract, the data come from two separate batches (`2023_exp` and `auth`). We add this information in our objects phenotypic data. We also add information about the treatment and the timepoint of sample collection.
+
+```{r batch}
+# Create batch variable
+batch = c(rep("2023_exp", 8), rep("auth", 6)) # 2 batches
+
+HMBA_ind = grepl("HMBA", colnames(x))
+treatment = rep("control", 14)
+treatment[HMBA_ind] = "HMBA" # 2 treatments
+
+timepoint = c("24h", "24h", "48h", "48h", "72h", "72h", "48h", "48h",
+              "24h", "48h", "72h", "24h", "48h", "72h")
+
+# Add to the DGE object
+x$samples$batch = factor(batch)
+x$samples$batch = relevel(x$samples$batch, ref = "auth")
+x$samples$treatment = factor(treatment)
+x$samples$treatment = relevel(x$samples$treatment, ref = "control")
+x$samples$timepoint = factor(timepoint)
+x$samples$timepoint = relevel(x$samples$timepoint, ref = "24h")
+rm(batch, treatment, timepoint, HMBA_ind)
+```
+
+## Additional gene annotation
+We already have Gene Symbol annotation for the rows of each sample's library. However, we will add NCBI Entrez ID's as well so that at least one additional annotation is available. The symbols to Entrez relationship is not a 1:1 relationship, however we use here the `org.Mm.eg.db` to do the mapping of symbols to their official Entrez identifier, wherever this is possible.
+
+```{r entrez}
+# Map the genes to Entrez IDs so that we have at least two annotations available
+library(org.Mm.eg.db)
+official = org.Mm.egSYMBOL
+mapped_genes_official = mappedkeys(official)
+official_df = as.data.frame(official[mapped_genes_official])
+official_df = official_df %>% dplyr::rename(EntrezGene.ID = gene_id, Gene.Symbol = symbol)
+official_df$HGNC_Official = "Yes"
+official_df = official_df[-which(duplicated(official_df$Gene.Symbol)), ]
+
+rm(official, mapped_genes_official, files)
+
+# Create a genes slot with gene annotation
+gene_annot = as.data.frame(list(Gene.Symbol = rownames(x))) %>%
+  left_join(official_df, by = "Gene.Symbol") %>%
+  dplyr::select(-HGNC_Official)
+x$genes = gene_annot
+```
+
+## Data filtering
+It's common in RNA-seq experiments to find row in a count matrix which are completely filled with zero's. These rows are uninformative and only add noise to downstream analytical steps.
+
+```{r zeros}
+# How many genes in this dataset are all zeros?
+table(rowSums(x$counts==0)==14) # 14: number of samples
+```
+
+```{r print_zero_percentage}
+print(paste0(round(100*8463/(16520+8463), 2), "% of genes only have zero counts."))
+```
+A considerable number of rows (8463, ~34%) must be removed from the matrix. Along with these rows, we must remove other noisy rows, e.g. rows which are mostly zero, or rows with only zeros on particular subgroups of interest for our analysis. In order to do that we use the `filterbyExpr()` function of `edgeR`.
+
+`filterByExpr()` is used to filter out genes (or other countable features like transcripts) that are too lowly expressed to provide reliable statistical inference in the context of a differential expression analysis.
+
+The function calculates a threshold for the minimum count that a gene should have across the samples in the experiment. The threshold is calculated based on the library sizes and the complexity of the experimental design. Genes that don't meet this threshold are filtered out.
+
+The function uses the following criteria by default:
+
+  1. Each gene must have a count-per-million (CPM) above a certain threshold (by default, log~2~(CPM) of 0.5) in a certain number of samples. For more information on CPM, RPKM, FPKM and TPM check [here](https://www.rna-seqblog.com/rpkm-fpkm-and-tpm-clearly-explained/).
+  2. The "certain number of samples" is determined by the experimental design. For a simple two-group comparison, it would be the size of the smaller group. For a more complex design, it would be the smallest number of samples that can give a degree of freedom in the linear model fit. In other words, the smallest group of samples that can possibly show differential expression.
+
+In our case, we are using a complex experimental design with interaction terms. The function will look at this design and determine the smallest number of samples that can possibly show differential expression given this design. It will then filter out genes that don't have a sufficient count in at least this many samples. The function then checks two criteria for each gene:
+
+  1. CPM cutoff: The function calculates the CPM for each gene in each sample, and checks that each gene has a CPM above a certain <u>cutoff</u> in at least `MinSampleSize` (source code variable) samples. In our case, based on the source code, `MinSampleSize = 1`. In order to estimate `MinSampleSize`, the Hat matrix, $H$, of the design matrix $X$ must be computed as $$H = X(X^TX)^{-1}X^T$$. Here, $X^T$ denotes the transpose of the matrix $X$, and $(X^TX)^{-1}$ denotes the inverse of the matrix product $X^TX$. `hat()` computes $H$ from $X$ and outputs the diagonal entries of $H$, which measure the influence that each individual observation has on its own predicted value. Then, `MinSampleSize` is calculated as the ratio of 1 over the maximum value in the diagonal of $H$.
+  ```{r hat}
+  # No need to run this code, it is automatically done by filterByExpr(). Only used for context here.
+  h = hat(design)
+  h
+  ```
+  ```r{minsamplesize}
+  MinSampleSize = 1/max(hat(design))
+  ```
+  2. The <u>cutoff</u> is calculated as `min.count / MedianLibSize * 1e6`, where `min.count` is a minimum count (default is `10`), and `MedianLibSize` is the median library size (total count) across all samples.
+  
+  3. Total count cutoff: The function checks that the total count for each gene (summed across all samples) is above a certain cutoff (min.total.count, default is 15).
+  
+  We are using default values here.
+  
+  
+
+
