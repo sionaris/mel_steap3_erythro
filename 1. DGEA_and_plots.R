@@ -77,8 +77,12 @@ table(rowSums(x$counts==0)==14) # 14: number of samples
 print(paste0(round(100*8463/(16520+8463), 2), "% of genes only have zero counts."))
 # 33.88% of genes only have zero counts.
 
+# Create a full design matrix for the filtering
+design = model.matrix(~ x$samples$batch + x$samples$treatment + x$samples$timepoint +
+                        x$samples$treatment:x$samples$timepoint)
+
 # We need to filter out uninformative genes
-keep.exprs = names(which(filterByExpr(x, group=x$samples$treatment) == TRUE))
+keep.exprs = names(which(filterByExpr(x, design = design) == TRUE))
 x_filt = x
 x_filt$counts = x_filt$counts[keep.exprs,]
 x_filt$genes = x_filt$genes[x_filt$genes$Gene.Symbol %in% keep.exprs,]
