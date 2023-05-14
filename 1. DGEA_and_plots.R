@@ -304,7 +304,7 @@ annotate_figure(fig, left = textGrob(bquote(bold("sd")), rot = 90, vjust = 1, gp
                 bottom = textGrob(bquote(bold("rank (mean)")), gp = gpar(cex = 1)))
 dev.off()
 
-# Heatmap of the count matrix - top 100 genes
+# Heatmap of the count matrix - top 50 genes
 library(pheatmap)
 library(rcartocolor)
 select = order(rowMeans(counts(dds,normalized=TRUE)),
