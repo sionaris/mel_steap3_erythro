@@ -16,11 +16,12 @@ abstract: >
   for which results are adjusted.
 output: 
   html_document:
+    fig_width: 10
     toc: true
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(echo = TRUE, cache = FALSE, dev = "tiff", tidy = FALSE,
+knitr::opts_chunk$set(echo = TRUE, cache = FALSE, dev = "png", tidy = FALSE,
                       message = FALSE, error = FALSE, warning = TRUE)
 ```
 
@@ -31,7 +32,7 @@ suppressWarnings(library(dplyr))
 suppressWarnings(library(DESeq2))
 suppressWarnings(library(edgeR))
 suppressWarnings(library(org.Mm.eg.db))
-suppressWarnings(library(biomaRt))
+suppressWarnings(library(AnnotationHub))
 suppressWarnings(library(ggplot2))
 suppressWarnings(library(tidyr))
 suppressWarnings(library(vsn))
@@ -58,9 +59,9 @@ All the files are in the subdirectory `Count_files/`. We first load all of their
 files = list.files("Count_files/")
 x = readDGE(paste0("Count_files/", files), 
             columns = c(1,2))
+dim(x)
 ```
-
-We first check the sample names, which are currently very long (full directory locations).
+Our object contains a count expression matrix with 24983 features (genes) and 14 samples. We first check the sample names, which are currently very long (full directory locations).
 ```{r print_colnames_pre}
 # Print current column names of x (sample names)
 colnames(x)
@@ -156,23 +157,216 @@ The function uses the following criteria by default:
   1. Each gene must have a count-per-million (CPM) above a certain threshold (by default, log~2~(CPM) of 0.5) in a certain number of samples. For more information on CPM, RPKM, FPKM and TPM check [here](https://www.rna-seqblog.com/rpkm-fpkm-and-tpm-clearly-explained/).
   2. The "certain number of samples" is determined by the experimental design. For a simple two-group comparison, it would be the size of the smaller group. For a more complex design, it would be the smallest number of samples that can give a degree of freedom in the linear model fit. In other words, the smallest group of samples that can possibly show differential expression.
 
-In our case, we are using a complex experimental design with interaction terms. The function will look at this design and determine the smallest number of samples that can possibly show differential expression given this design. It will then filter out genes that don't have a sufficient count in at least this many samples. The function then checks two criteria for each gene:
+In our case, we are using a complex experimental design with interaction terms. The function will look at this design and determine the smallest number of samples that can possibly show differential expression given this design. It will then filter out genes that don't have a sufficient count in at least this many samples. Let's firstly define the design matrix:
 
-  1. CPM cutoff: The function calculates the CPM for each gene in each sample, and checks that each gene has a CPM above a certain <u>cutoff</u> in at least `MinSampleSize` (source code variable) samples. In our case, based on the source code, `MinSampleSize = 1`. In order to estimate `MinSampleSize`, the Hat matrix, $H$, of the design matrix $X$ must be computed as $$H = X(X^TX)^{-1}X^T$$. Here, $X^T$ denotes the transpose of the matrix $X$, and $(X^TX)^{-1}$ denotes the inverse of the matrix product $X^TX$. `hat()` computes $H$ from $X$ and outputs the diagonal entries of $H$, which measure the influence that each individual observation has on its own predicted value. Then, `MinSampleSize` is calculated as the ratio of 1 over the maximum value in the diagonal of $H$.
-  ```{r hat}
-  # No need to run this code, it is automatically done by filterByExpr(). Only used for context here.
-  h = hat(design)
-  h
-  ```
-  ```r{minsamplesize}
-  MinSampleSize = 1/max(hat(design))
-  ```
+```{r design}
+# Create a full design matrix for the filtering
+design = model.matrix(~ x$samples$batch + x$samples$treatment + x$samples$timepoint +
+                        x$samples$treatment:x$samples$timepoint)
+```
+Our design matrix contains an interaction term because we are interested in making nested comparisons later, based on results from differential expression analysis. The function then checks two criteria for each gene:
+
+  1. CPM cutoff: The function calculates the CPM for each gene in each sample, and checks that each gene has a CPM above a certain <u>cutoff</u> in at least `MinSampleSize` (source code variable) samples. In our case, based on the source code, `MinSampleSize = 1`. In order to estimate `MinSampleSize`, the Hat matrix, $H$, of the design matrix $X$ must be computed as $$H = X(X^TX)^{-1}X^T$$ Here, $X^T$ denotes the transpose of the matrix $X$, and $(X^TX)^{-1}$ denotes the inverse of the matrix product $X^TX$. `hat()` computes $H$ from $X$ and outputs the diagonal entries of $H$, which measure the influence that each individual observation has on its own predicted value. Then, `MinSampleSize` is calculated as the ratio of 1 over the maximum value in the diagonal of $H$.
+```{r hat}
+# No need to run this code, it is automatically done by filterByExpr(). Only used for context here.
+h = stats::hat(design)
+h
+```
+```{r minsamplesize}
+MinSampleSize = 1/max(hat(design))
+MinSampleSize
+```
   2. The <u>cutoff</u> is calculated as `min.count / MedianLibSize * 1e6`, where `min.count` is a minimum count (default is `10`), and `MedianLibSize` is the median library size (total count) across all samples.
   
-  3. Total count cutoff: The function checks that the total count for each gene (summed across all samples) is above a certain cutoff (min.total.count, default is 15).
+  3. <u>Total count cutoff</u>: The function checks that the total count for each gene (summed across all samples) is above a certain cutoff (min.total.count, default is 15).
   
-  We are using default values here.
-  
-  
+We are using default values here.
+```{r filterbyexpr}
+# Remove h and MinSampleSize from the environment if you ran the previous two chunks
+if (exists("h")) { rm(h) }
+if (exists("MinSampleSize")) { rm(MinSampleSize) }
 
+# Filter using fitlerByExprs()
+keep.exprs = names(which(filterByExpr(x, design = design) == TRUE))
+x_filt = x
+x_filt$counts = x_filt$counts[keep.exprs,]
+x_filt$genes = x_filt$genes[x_filt$genes$Gene.Symbol %in% keep.exprs,]
+dim(x_filt)
+```
+We now have 12027 genes (out of the original 24983) that fulfill the default criteria of `filterByExprs()`.
 
+## Generate a TPM (Transcripts Per Million) matrix
+The transformation from counts to TPM requires the length of each gene to be known. In order to transform a count matrix to a TPM matrix we follow these three steps (taken again from [here](https://www.rna-seqblog.com/rpkm-fpkm-and-tpm-clearly-explained/):
+
+  1. Divide the read counts by the length of each gene in kilobases (kb). This gives us reads per kilobase `rpk`.
+  2. Count up all the `rpk` values in a sample and divide this number by 1,000,000. This is our “per million” scaling factor.
+  3. Divide the `rpk` values by the “per million” scaling factor. This gives us TPM.
+  
+The sum of all TPMs in each sample is the same. This makes it easier to compare the <u>proportion</u> of reads that mapped to a gene in each sample. If the TPM for gene A in Sample 1 is 3.33 and the TPM in sample B is 3.33, then we know that the exact same proportion of total reads mapped to gene A in both samples. **That does not mean that the original counts for gene A were equal, but their proportion over all the counts for both samples, is the same.**
+
+We use the `AnnotationHub` library (which automatically requires the `ensembldb` library too) in order to retrieve **transcript** (not full gene) lengths for the genes in our data. It is important to notice that there may be more than one length for a gene, transcript, coding sequence etc. and lengths may also change from time to time based on new knowledge. Here, for reproducibility, we keep the longest transcript length for each mapped transcript. After computing the TPM matrix, we also generate a log~2~-scaled version using the transformation `log2(tpm+1)` (the pseudocount of `1` here is arbitrary) which <u>sometimes</u> ([but not always](https://www.biorxiv.org/content/10.1101/2022.06.11.495771v2.full.pdf), check refs 4,18,34,35,37 if interested) produces a normal distribution.
+
+```{r tpm}
+# Create an AnnotationHub object
+ah = AnnotationHub()
+
+# Query for the latest Mus musculus EnsDb object
+latest_mus_musculus = query(ah, c("EnsDb", "Mus musculus")) 
+
+# Print the latest version
+tail(latest_mus_musculus)
+
+# ID of interest is "AH109650"
+edb = ah[["AH109650"]]
+
+# Get gene data
+genes_data = genes(edb)
+genes_map = data.frame(gene_id = genes_data$gene_id,
+                       Gene.Symbol = genes_data$gene_name)
+
+# Get transcript data
+transcripts_data = transcripts(edb)
+transcript_lengths = data.frame(transcript_id = transcripts_data$tx_id,
+                                gene_id = transcripts_data$gene_id,
+                                tx_length = width(transcripts_data)) %>%
+  inner_join(genes_map, by = "gene_id") %>%
+  dplyr::filter(!Gene.Symbol == "") %>%
+  group_by(Gene.Symbol) %>%
+  summarise(longest_transcript_length = max(tx_length, na.rm = TRUE))
+
+# Calculate gene lengths in kilobases
+transcript_lengths$transcript_length_kb = transcript_lengths$longest_transcript_length / 1000
+
+# Map gene lengths to rownames of the counts matrix
+rownames(transcript_lengths) = transcript_lengths$Gene.Symbol
+mapped = transcript_lengths[transcript_lengths$Gene.Symbol %in% 
+                                      x_filt$genes$Gene.Symbol,]
+mapped_lengths = mapped$transcript_length_kb
+
+# Calculate counts per kilobase (CPK)
+cpk = x_filt$counts[mapped$Gene.Symbol, ] / mapped_lengths
+
+# Calculate the sum of CPK values for each sample
+cpk_sum = colSums(cpk)
+
+# Calculate TPM values
+tpm = cpk / cpk_sum * 1e6
+log2tpm = log2(tpm + 1)
+rm(cpk, cpk_sum, keep.exprs, mapped_lengths, ah, edb)
+```
+
+In our experiment there are two features which were included in the assay used, which are of no use, as one can tell by their names: `"no_feature", "ambiguous"`. We remove those.
+
+```{r removals}
+removals = c(which(x_filt$genes$Gene.Symbol == "no_feature"),
+             which(x_filt$genes$Gene.Symbol == "ambiguous"))
+x_filt$genes = x_filt$genes[-removals, ]
+x_filt$counts = x_filt$counts[-removals, ]
+```
+
+That concludes the preprocessing. We now proceed with creating a `DESeq2` object for our analysis and the production of exploratory plots.
+
+# Creating a DESeq2 object
+We will use our `x_filt` object's data to generate a `DESeq2` object which will be handy for all types of analysis from now on.
+```{r deseq2}
+# DESeq2 object
+dds = DESeqDataSetFromMatrix(countData = x_filt$counts,
+                             colData = x_filt$samples,
+                             design = ~ batch + treatment + timepoint +
+                               treatment:timepoint)
+
+featureData = as.data.frame(x_filt$genes)
+mcols(dds) = DataFrame(mcols(dds), featureData)
+mcols(dds)
+rm(featureData)
+```
+
+# Exploratory analysis
+## Distributions of data
+**Note:** All plots generated here are not automatically exported as figures in the repository. However, the scripts in this repository provide additional code to produce high quality figures and export them.
+
+In this section, we produce two types of plots for two different types of expression matrices (counts and `log2(tpm+1)`). Both types of plots display the distribution of expression values across all samples. In the first type (density curves), the overall distribution is plotted, while in the second type (color density plots), the distribution of each sample's values are overlaid on top of the others.
+
+We define two functions which make use of `ggplot2` and `tidyr` functionality to generate our distribution plots and keep our code succinct.
+
+```{r distribution_plot_functions}
+# Density curve function
+create_density_curve <- function(matrix) {
+  as.data.frame(matrix) %>%
+    gather(.) %>%
+    ggplot(aes(x = value, fill = "Density Curve")) + 
+    geom_density(alpha = 0.5, position = "identity") +
+    xlim(-1, NA) +
+    labs(title = "Distribution of values by sample",
+         x = "Value", y = "Density") +
+    theme_classic()+
+    theme(legend.position = "none")
+}
+
+# Per column density plot
+create_density_plot_color <- function(matrix) {
+  as.data.frame(matrix) %>%
+    gather(., key = "sample", value = "value") %>%
+    ggplot(aes(x = value, fill = sample)) + 
+    geom_density(alpha = 0.5, position = "identity") +
+    xlim(-1, NA) +
+    labs(title = "Distribution of values by sample",
+         x = "Value", y = "Density") +
+    theme_classic()+
+    theme(legend.position = "none")
+}
+```
+
+From now on, conditional statements such as the following will precede plot generation and exporting code. Their purpose is to create output directories if they do not already exist (e.g. in the case someone runs the code without downloading the project from [GitHub](https://github.com/sionaris/mel_auth)).
+
+```{r first_cond_for_output_dir}
+# Create folder for distribution plots
+if (!dir.exists("MEL_exploratory_plots")) {
+  dir.create("MEL_exploratory_plots")
+}
+
+if (!dir.exists("MEL_exploratory_plots/MEL_distribution_plots")) {
+  dir.create("MEL_exploratory_plots/MEL_distribution_plots")
+}
+```
+
+```{r count_densities_no_xlim}
+# Density curve and sample densities for raw counts
+ggarrange(create_density_curve(x_filt$counts), 
+          create_density_plot_color(x_filt$counts), 
+          ncol = 2, nrow = 1,
+          labels = NULL,
+          font.label = list(size = 4, color = "black", face = "bold"))
+```
+
+The previous plot contains count outliers (abnormally high counts) which make it difficult to see the distribution of counts near zero. We replot with `xlim` set to `200`.
+
+```{r count_densities_with_xlim}
+# Density curve and sample densities for raw counts
+ggarrange(create_density_curve(x_filt$counts)+
+  scale_x_continuous(limits = c(-1, 200), breaks = seq(0, 200, 20)), 
+          create_density_plot_color(x_filt$counts)+
+  scale_x_continuous(limits = c(-1, 200), breaks = seq(0, 200, 20)), 
+          ncol = 2, nrow = 1,
+          labels = NULL,
+          font.label = list(size = 4, color = "black", face = "bold"))
+```
+
+Now we produce the same figures for the `log2(tpm+1)` data:
+```{r tpm_densities}
+# Density curve and sample densities for raw counts
+ggarrange(create_density_curve(log2tpm), 
+          create_density_plot_color(log2tpm), 
+          ncol = 2, nrow = 1,
+          labels = NULL,
+          font.label = list(size = 4, color = "black", face = "bold"))
+```
+
+## Variance stabilization transformations
+
+```{r vst_rlog}
+# VST and rlog transformations
+vsd = vst(dds, blind = FALSE)
+rld = rlog(dds, blind = FALSE)
+```
+See [here](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#data-transformations-and-visualization) for why we set `blind = FALSE`.
