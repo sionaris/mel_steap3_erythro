@@ -89,36 +89,53 @@ x_filt$genes = x_filt$genes[x_filt$genes$Gene.Symbol %in% keep.exprs,]
 dim(x_filt)
 
 # Create a TPM matrix
-library(biomaRt)
-mart = useMart(biomart = "ENSEMBL_MART_ENSEMBL", dataset = "mmusculus_gene_ensembl")
-gene_lengths = getBM(
-  attributes = c("external_gene_name", "transcript_length"), 
-  filters = "external_gene_name", 
-  values = rownames(x), 
-  mart = mart
-)
+library(AnnotationHub)
+
+# Create an AnnotationHub object
+ah = AnnotationHub()
+
+# Query for the latest Mus musculus EnsDb object
+latest_mus_musculus = query(ah, c("EnsDb", "Mus musculus")) 
+
+# Print the latest version
+tail(latest_mus_musculus)
+
+# ID of interest is "AH109650"
+edb = ah[["AH109650"]]
+
+# Get gene data
+genes_data = genes(edb)
+genes_map = data.frame(gene_id = genes_data$gene_id,
+                       Gene.Symbol = genes_data$gene_name)
+
+# Get transcript data
+transcripts_data = transcripts(edb)
+transcript_lengths = data.frame(transcript_id = transcripts_data$tx_id,
+                                gene_id = transcripts_data$gene_id,
+                                tx_length = width(transcripts_data)) %>%
+  inner_join(genes_map, by = "gene_id") %>%
+  dplyr::filter(!Gene.Symbol == "") %>%
+  group_by(Gene.Symbol) %>%
+  summarise(longest_transcript_length = max(tx_length, na.rm = TRUE))
 
 # Calculate gene lengths in kilobases
-gene_lengths$gene_length_kb = gene_lengths$transcript_length / 1000
+transcript_lengths$transcript_length_kb = transcript_lengths$longest_transcript_length / 1000
 
 # Map gene lengths to rownames of the counts matrix
-gene_lengths = gene_lengths[!duplicated(gene_lengths$external_gene_name), ]
-rownames(gene_lengths) = gene_lengths$external_gene_name
-mapped_lengths = gene_lengths[intersect(x_filt$genes$Gene.Symbol, 
-                                        gene_lengths$external_gene_name),
-                              "gene_length_kb"]
+rownames(transcript_lengths) = transcript_lengths$Gene.Symbol
+mapped = transcript_lengths[transcript_lengths$Gene.Symbol %in% 
+                              x_filt$genes$Gene.Symbol,]
+mapped_lengths = mapped$transcript_length_kb
 
 # Calculate counts per kilobase (CPK)
-cpk = x_filt$counts[intersect(x_filt$genes$Gene.Symbol, 
-                         gene_lengths$external_gene_name), ] / mapped_lengths
-
+cpk = x_filt$counts[mapped$Gene.Symbol, ] / mapped_lengths
 # Calculate the sum of CPK values for each sample
 cpk_sum = colSums(cpk)
 
 # Calculate TPM values
 tpm = cpk / cpk_sum * 1e6
 log2tpm = log2(tpm + 1)
-rm(cpk, cpk_sum, keep.exprs, mapped_lengths, mart)
+rm(cpk, cpk_sum, keep.exprs, mapped_lengths, ah, edb)
 
 removals = c(which(x_filt$genes$Gene.Symbol == "no_feature"),
              which(x_filt$genes$Gene.Symbol == "ambiguous"))
