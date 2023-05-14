@@ -38,6 +38,7 @@ suppressWarnings(library(tidyr))
 suppressWarnings(library(vsn))
 suppressWarnings(library(ggpubr))
 suppressWarnings(library(cowplot))
+suppressWarnings(library(grid))
 suppressWarnings(library(pheatmap))
 suppressWarnings(library(rcartocolor))
 suppressWarnings(library(RColorBrewer))
@@ -362,7 +363,12 @@ ggarrange(create_density_curve(log2tpm),
           font.label = list(size = 4, color = "black", face = "bold"))
 ```
 
-## Variance stabilization transformations
+## Count data transformations
+Two common count data transformations in the `DESeq2` package are the variance-stabilizing transformation (`vst`) and the regularized logarithm transformation (`rlog`). The point of these two transformations is to remove the <u>dependence of the variance on the mean</u>, particularly the high variance of the logarithm of count data when the mean is low. Both VST and rlog use the experiment-wide trend of variance over mean, in order to transform the data to remove the experiment-wide trend. Note that it is neither required nor desired that all the genes have exactly the same variance after transformation.
+
+The VST is a technique to stabilize the variance across the range of count data in RNA-seq analysis. It is based on the properties of the negative binomial distribution which is often used to model RNA-seq count data. When `fitType="parametric"` is used, the dispersion-mean relationship is modeled as a parametric curve. This transformation aims to stabilize the variance across the range of count data. It helps to normalize the data in such a way that for large counts, the transformation becomes asymptotically equal to the logarithm (base 2) of normalized counts. The full mathematical process for the default case (`fitType="parametric"`) [here](https://github.com/mikelove/DESeq2/blob/devel/inst/script/vst.pdf).
+
+The function `rlog()`, stands for regularized log, transforms the original count data to the log2 scale by fitting a model with a term for each sample and a prior distribution on the coefficients which is estimated from the data. The resulting data contains elements defined as: $$\log_2(q_{ij}) = \beta_{i0} + \beta_{ij}$$ where $q_{ij}$ is a parameter proportional to the expected true concentration of fragments for gene $i$ and sample $j$, $β_{i0}$ is an intercept which does not undergo shrinkage, and $β_{ij}$ is the sample-specific effect which is shrunk toward zero based on the dispersion-mean trend over the entire dataset. The trend typically captures high dispersions for low counts, and therefore these genes exhibit higher shrinkage from the `rlog()`. In conclusion, `rlog()` works in a way which minimizes differences between samples for rows with small counts, and which normalizes with respect to library size. The rlog transformation produces a similar variance stabilizing effect as `vst()`, though `rlog()` is more robust in the case when the size factors vary widely. However, it is slower than `vst()`, which may be important for big sample sizes.
 
 ```{r vst_rlog}
 # VST and rlog transformations
@@ -370,3 +376,59 @@ vsd = vst(dds, blind = FALSE)
 rld = rlog(dds, blind = FALSE)
 ```
 See [here](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#data-transformations-and-visualization) for why we set `blind = FALSE`.
+
+We now proceed by estimating size factors and producing mean - sd ($\sqrt{var}$) plots for three different transformations: $\log_2(counts + 1)$, $\text{vst}(counts)$ and $\text{rlog}(counts)$.
+
+```{r mean_sd_plots}
+dds = estimateSizeFactors(dds)
+
+# Create folder for mean-variance plots and exploratory heatmaps
+if (!dir.exists("MEL_exploratory_plots/Transformations_and_heatmaps")) {
+  dir.create("MEL_exploratory_plots/Transformations_and_heatmaps")
+}
+
+# Produce a scatter plot of transformed counts for the first two samples
+df = bind_rows(
+  as.data.frame(log2(counts(dds, normalized=TRUE)[, 1:2]+1)) %>%
+    mutate(transformation = "log2(x + 1)"),
+  as.data.frame(assay(vsd)[, 1:2]) %>% mutate(transformation = "vst"),
+  as.data.frame(assay(rld)[, 1:2]) %>% mutate(transformation = "rlog"))
+
+colnames(df)[1:2] <- c("x", "y")  
+
+lvls = c("log2(x + 1)", "vst", "rlog")
+df$transformation = factor(df$transformation, levels=lvls)
+
+ggplot(df, aes(x = x, y = y)) + geom_hex(bins = 80) +
+  coord_fixed() + facet_grid( . ~ transformation)
+
+# Produce mean - sd plots 
+ntd = normTransform(dds) # log2(counts + 1) transformation
+plot1 = meanSdPlot(assay(ntd))$gg + rremove("ylab") + rremove("xlab") + 
+  ggtitle(bquote(bold("log2(counts + 1)"))) +
+  theme(plot.title = element_text(hjust = 0.5, vjust = 0.5))
+plot2 = meanSdPlot(assay(rld))$gg + rremove("ylab") + rremove("xlab") + 
+  ggtitle(bquote(bold("rlog"))) +
+  theme(plot.title = element_text(hjust = 0.5, vjust = 0.5))
+plot3 = meanSdPlot(assay(vsd))$gg + rremove("ylab") + rremove("xlab") + 
+  ggtitle(bquote(bold("vst"))) +
+  theme(plot.title = element_text(hjust = 0.5, vjust = 0.5))
+
+# Use ggarrange to align the three plots horizontally and set the x-axis and y-axis labels
+fig = ggarrange(plot1, plot2, plot3, 
+                ncol = 3, nrow = 1, 
+                common.legend = TRUE, legend = "bottom",
+                labels = c("A", "B", "C"),
+                align = "hv",
+                font.label = list(size = 10, color = "black", face = "bold", family = NULL, position = "top"))
+annotate_figure(fig, left = textGrob(bquote(bold("sd")), rot = 90, vjust = 1, gp = gpar(cex = 1)),
+                bottom = textGrob(bquote(bold("rank (mean)")), gp = gpar(cex = 1)))
+```
+
+
+
+
+
+
+
+
