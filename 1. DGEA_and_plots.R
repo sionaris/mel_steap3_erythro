@@ -435,6 +435,8 @@ pcaplot = ggplot(pcaData, aes(PC1, PC2, color = treatment, shape = batch)) +
 
 # Generalized PCA (more appropriate for count data)
 library(glmpca)
+RNGversion("4.2.2")
+set.seed(123)
 gpca = glmpca(counts(dds), L=2)
 gpca.dat = gpca$factors
 gpca.dat$treatment = dds$treatment
