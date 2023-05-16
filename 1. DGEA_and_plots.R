@@ -342,7 +342,7 @@ dev.off()
 tiff("MEL_exploratory_plots/Transformations_and_heatmaps/top50_heatmap_vst.tiff", res = 200, width = 1420, 
      height = 1080, compression = "lzw")
 pheatmap(assay(vsd)[select,], cluster_rows=FALSE, show_rownames=FALSE,
-         cluster_cols=FALSE, annotation_col=df, main = "vsd",
+         cluster_cols=FALSE, annotation_col=df, main = "vst",
          annotation_colors = ann_colors, fontsize = 6)
 dev.off()
 
@@ -408,10 +408,10 @@ pcaData = pcaData %>%
 percentVar = round(100 * attr(pcaData, "percentVar"))
 pcaplot = ggplot(pcaData, aes(PC1, PC2, color = treatment, shape = batch)) +
   geom_point(size = 0.5, alpha = 0.65) +
-  geom_text_repel(aes(label = timepoint, segment.linetype = 1,
-                      segment.color = "black", segment.size = 0.1),
+  geom_text_repel(aes(label = timepoint), segment.linetype = 1,
+                      segment.color = "black", segment.size = 0.1,
                   min.segment.length = 0,
-                  size = 1, nudge_y = 0.03, nudge_x = 0.03) +
+                  size = 1, nudge_y = 0.03, nudge_x = 0.03, show.legend = FALSE) +
   xlab(paste0("PC1: ",percentVar[1],"% variance")) +
   ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
   ggtitle("Principal Component Analysis: VST") +
@@ -443,10 +443,10 @@ gpca.dat$timepoint = dds$timepoint
 
 gpcaplot = ggplot(gpca.dat, aes(x = dim1, y = dim2, color = treatment, shape = batch)) +
   geom_point(size = 0.5, alpha = 0.65) +
-  geom_text_repel(aes(label = timepoint, segment.linetype = 1,
-                      segment.color = "black", segment.size = 0.1),
+  geom_text_repel(aes(label = timepoint), segment.linetype = 1,
+                      segment.color = "black", segment.size = 0.1,
                   min.segment.length = 0,
-                  size = 1, nudge_y = 0.03, nudge_x = 0.03) +
+                  size = 1, nudge_y = 0.03, nudge_x = 0.03, show.legend = FALSE) +
   ggtitle("Generalized Principal Component Analysis (glmpca, counts)") +
   theme_classic() +
   scale_color_manual(name = "treatment", values = c("orange", "purple4"),
