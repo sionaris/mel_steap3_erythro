@@ -179,7 +179,7 @@ MinSampleSize
 ```
   2. The <u>cutoff</u> is calculated as `min.count / MedianLibSize * 1e6`, where `min.count` is a minimum count (default is `10`), and `MedianLibSize` is the median library size (total count) across all samples.
   
-  3. <u>Total count cutoff</u>: The function checks that the total count for each gene (summed across all samples) is above a certain cutoff (min.total.count, default is 15).
+  3. <u>Total count cutoff</u>: The function checks that the total count for each gene (summed across all samples) is above a certain cutoff (min.total.count, default is `15`).
   
 We are using default values here.
 ```{r filterbyexpr}
@@ -591,7 +591,7 @@ ggarrange(pcaplot, gpcaplot,
           labels = c("A", "B"), legend = "right",
           font.label = list(size = 10, color = "black", face = "bold"))
 ```
-In the left plot (PCA on the VST data), we see that the principal direction of variation is dominated by the treatment effect, as purple points (HMBA-treated samples) cluster to the left and yellow points (control samples) cluster to the right. There's also a clear separation in PC2, which is dominated by the batch effect, with samples from `batch = "auth"` at the top and samples from `batch = 2023_exp"` at the bottom. The effect of timepoint is mild, however samples from similar timepoints (for a given batch) seem to cluster together.
+In the left plot (PCA on the VST data), we see that the principal direction of variation is dominated by the treatment effect, as purple points (HMBA-treated samples) cluster to the left and yellow points (control samples) cluster to the right. There's also a clear separation in PC2, which is dominated by the batch effect, with samples from `batch = "auth"` at the top and samples from `batch = "2023_exp"` at the bottom. The effect of timepoint is mild, however samples from similar timepoints (for a given batch) seem to cluster together.
 
 In the GPCA plot to the right, we notice the same effect in dimension 1 as in PC1, were samples are clearly separated by treatment. The similarities between timepoints are still noticeable, but the batch effect is not as evident. Additionally, we see that the `"auth"` samples for 72h are clustering away from the rest of the samples in similar manner.
 
