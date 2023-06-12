@@ -196,6 +196,13 @@ dim(x_filt)
 ```
 We now have 12027 genes (out of the original 24983) that fulfill the default criteria of `filterByExprs()`.
 
+**However, we decided that it is best to proceed after only removing the full-zero rows:**
+```{r zero_filt}
+x_filt = x[-which(rowSums(x$counts==0)==14), ]
+dim(x_filt)
+```
+In this case, 16518 genes are retained.
+
 ## Generate a TPM (Transcripts Per Million) matrix
 The transformation from counts to TPM requires the length of each gene to be known. In order to transform a count matrix to a TPM matrix we follow these three steps (taken again from [here](https://www.rna-seqblog.com/rpkm-fpkm-and-tpm-clearly-explained/):
 

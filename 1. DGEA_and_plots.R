@@ -88,6 +88,11 @@ x_filt$counts = x_filt$counts[keep.exprs,]
 x_filt$genes = x_filt$genes[x_filt$genes$Gene.Symbol %in% keep.exprs,]
 dim(x_filt)
 
+
+# However, we decided it is best to proceed with filtering only the rows with
+# a total count of zero
+x_filt = x[-which(rowSums(x$counts==0)==14), ]
+
 # Create a TPM matrix
 library(AnnotationHub)
 
