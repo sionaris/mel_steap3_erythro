@@ -721,10 +721,10 @@ contrasts = list(HMBA24h_vs_Control48h = list("treatment_HMBA_vs_control",
                                               "treatmentHMBA.timepoint48h")),
                  HMBA72h_vs_HMBA24h = list(c("treatmentHMBA.timepoint72h",
                                              "timepoint_72h_vs_24h")),
-                 HMBA72h_vs_HMBA48h = list(c("timepoint_48h_vs_24h",
-                                             "treatmentHMBA.timepoint48h"),
-                                           c("treatmentHMBA.timepoint72h",
-                                             "timepoint_72h_vs_24h")))
+                 HMBA72h_vs_HMBA48h = list(c("treatmentHMBA.timepoint72h",
+                                             "timepoint_72h_vs_24h"), 
+                                           c("timepoint_48h_vs_24h",
+                                             "treatmentHMBA.timepoint48h")))
 
 # hmba24h vs control48h
 res_hmba24h_vs_control48h = results(dds, contrast=contrasts[["HMBA24h_vs_Control48h"]], 

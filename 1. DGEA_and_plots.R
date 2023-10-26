@@ -130,7 +130,7 @@ transcript_lengths$transcript_length_kb = transcript_lengths$longest_transcript_
 rownames(transcript_lengths) = transcript_lengths$Gene.Symbol
 mapped = transcript_lengths[transcript_lengths$Gene.Symbol %in% 
                               x_filt$genes$Gene.Symbol,]
-mapped_lengths = mapped$transcript_length_kb
+mapped_lengths = mapped$transcript_length_kb # length in kilobases
 
 # Calculate counts per kilobase (CPK)
 cpk = x_filt$counts[mapped$Gene.Symbol, ] / mapped_lengths
@@ -138,8 +138,8 @@ cpk = x_filt$counts[mapped$Gene.Symbol, ] / mapped_lengths
 cpk_sum = colSums(cpk)
 
 # Calculate TPM values
-tpm = cpk / cpk_sum * 1e6
-log2tpm = log2(tpm + 1)
+tpm = cpk / (cpk_sum / 1e6)
+ log2tpm = log2(tpm + 1)
 rm(cpk, cpk_sum, keep.exprs, mapped_lengths, ah, edb)
 
 removals = c(which(x_filt$genes$Gene.Symbol == "no_feature"),
@@ -577,22 +577,22 @@ contrasts = list(HMBA24h_vs_Control48h = list("treatment_HMBA_vs_control",
                                               "treatmentHMBA.timepoint48h")),
                  HMBA72h_vs_HMBA24h = list(c("treatmentHMBA.timepoint72h",
                                              "timepoint_72h_vs_24h")),
-                 HMBA72h_vs_HMBA48h = list(c("timepoint_48h_vs_24h",
-                                             "treatmentHMBA.timepoint48h"),
-                                           c("treatmentHMBA.timepoint72h",
-                                             "timepoint_72h_vs_24h")))
+                 HMBA72h_vs_HMBA48h = list(c("treatmentHMBA.timepoint72h",
+                                             "timepoint_72h_vs_24h"), 
+                                           c("timepoint_48h_vs_24h",
+                                             "treatmentHMBA.timepoint48h")))
 
 # hmba24h vs control48h
-res_hmba24h_vs_control48h <- results(dds, contrast=contrasts[["HMBA24h_vs_Control48h"]], 
+res_HMBA24h_vs_control48h <- results(dds, contrast=contrasts[["HMBA24h_vs_Control48h"]], 
                                      listValues=c(1, -1), test = "Wald")
 
 # hmba48h vs control48h
-res_hmba48h_vs_control48h <- results(dds, 
+res_HMBA48h_vs_control48h <- results(dds, 
                                      contrast=contrasts[["HMBA48h_vs_Control48h"]], 
                                      listValues=c(1, -1), test = "Wald")
 
 # hmba72h vs control48h
-res_hmba72h_vs_control48h <- results(dds, contrast=contrasts[["HMBA72h_vs_Control48h"]],
+res_HMBA72h_vs_control48h <- results(dds, contrast=contrasts[["HMBA72h_vs_Control48h"]],
                                      listValues=c(1, -1), test = "Wald")
 
 # HMBA48h vs HMBA24h
@@ -609,8 +609,8 @@ res_HMBA72h_vs_HMBA24h <- results(dds,
 res_HMBA72h_vs_HMBA48h <- results(dds, contrast=contrasts[["HMBA72h_vs_HMBA48h"]],
                                   listValues=c(1, -1), test = "Wald")
 
-results = list(res_hmba24h_vs_control48h, res_hmba48h_vs_control48h, 
-               res_hmba72h_vs_control48h, res_HMBA48h_vs_HMBA24h,
+results = list(res_HMBA24h_vs_control48h, res_HMBA48h_vs_control48h, 
+               res_HMBA72h_vs_control48h, res_HMBA48h_vs_HMBA24h,
                res_HMBA72h_vs_HMBA24h, res_HMBA72h_vs_HMBA48h)
 names(results) = names(contrasts)
 
