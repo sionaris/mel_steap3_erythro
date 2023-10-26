@@ -71,7 +71,8 @@ R.utils::setOption("clusterProfiler.download.method","libcurl")
 
 # Objects to keep after every loop
 keepers = c("ashr_dgea", "gsea_wb_list", "ora_wb_list", "pathfindR_wb_list",
-            "gsea_results", "ora_results", "pathfindR_results", "pathway_approaches")
+            "gsea_results", "ora_results", "pathfindR_results", "pathway_approaches",
+            "i")
 
 # ORA and GSEA #####
 for (i in 1:length(ashr_dgea)) {
@@ -89,7 +90,7 @@ for (i in 1:length(ashr_dgea)) {
   gene_list_conv = suppressWarnings(bitr(names(gene_list), fromType = "SYMBOL",
                           toType = "ENTREZID", OrgDb = org.Mm.eg.db))
   gene_list_entrez = gene_list
-  names(gene_list_entrez) = gene_list_conv$ENTREZID
+  names(gene_list_entrez) = as.character(gene_list_conv$ENTREZID)
   gene_list_entrez = sort(gene_list_entrez, decreasing = TRUE) # Entrez ids
   entrez_universe = suppressWarnings(bitr(ashr_dgea[[i]]$Gene.Symbol, fromType = "SYMBOL",
                                           toType = "ENTREZID", OrgDb = org.Mm.eg.db))$ENTREZID
@@ -113,11 +114,13 @@ for (i in 1:length(ashr_dgea)) {
                  seed = TRUE))
   
   if (exists("gseaGO")) {
-    # gseaGO = clusterProfiler::setReadable(gseaGO, 'org.Mm.eg.db')
-    gsea_output[["Gene Ontology"]] = gseaGO@result
-    
-    addWorksheet(gsea_wb_list[[i]], "GSEA_GO")
-    writeData(gsea_wb_list[[i]], "GSEA_GO", as.data.frame(gseaGO@result))
+    if (nrow(gseaGO) > 0) {
+      # gseaGO = clusterProfiler::setReadable(gseaGO, 'org.Mm.eg.db')
+      gsea_output[["Gene Ontology"]] = gseaGO@result
+      
+      addWorksheet(gsea_wb_list[[i]], "GSEA_GO")
+      writeData(gsea_wb_list[[i]], "GSEA_GO", as.data.frame(gseaGO@result))
+    }
   }
   
   # KEGG
@@ -133,11 +136,13 @@ for (i in 1:length(ashr_dgea)) {
                      seed = TRUE))
   
   if (exists("gseaKEGG")) {
-    gseaKEGG = clusterProfiler::setReadable(gseaKEGG, 'org.Mm.eg.db', keyType = "ENTREZID")
-    gsea_output[["KEGG"]] = gseaKEGG@result
-    
-    addWorksheet(gsea_wb_list[[i]], "GSEA_KEGG")
-    writeData(gsea_wb_list[[i]], "GSEA_KEGG", as.data.frame(gseaKEGG@result))
+    if (nrow(gseaKEGG) > 0) {
+      gseaKEGG = clusterProfiler::setReadable(gseaKEGG, 'org.Mm.eg.db', keyType = "ENTREZID")
+      gsea_output[["KEGG"]] = gseaKEGG@result
+      
+      addWorksheet(gsea_wb_list[[i]], "GSEA_KEGG")
+      writeData(gsea_wb_list[[i]], "GSEA_KEGG", as.data.frame(gseaKEGG@result))
+    }
   }
   
   # Reactome
@@ -152,12 +157,14 @@ for (i in 1:length(ashr_dgea)) {
                             seed = TRUE))
   
   if (exists("gseaReactome")) {
-    gseaReactome = clusterProfiler::setReadable(gseaReactome, 'org.Mm.eg.db',
-                                                keyType = "ENTREZID")
-    gsea_output[["Reactome"]] = gseaReactome@result
-    
-    addWorksheet(gsea_wb_list[[i]], "GSEA_Reactome")
-    writeData(gsea_wb_list[[i]], "GSEA_Reactome", as.data.frame(gseaReactome@result))
+    if (nrow(gseaReactome) > 0) {
+      gseaReactome = clusterProfiler::setReadable(gseaReactome, 'org.Mm.eg.db',
+                                                  keyType = "ENTREZID")
+      gsea_output[["Reactome"]] = gseaReactome@result
+      
+      addWorksheet(gsea_wb_list[[i]], "GSEA_Reactome")
+      writeData(gsea_wb_list[[i]], "GSEA_Reactome", as.data.frame(gseaReactome@result))
+    }
   }
   
   # WikiPathways
@@ -172,73 +179,80 @@ for (i in 1:length(ashr_dgea)) {
                  seed = TRUE))
   
   if (exists("gseaWP")) {
-    gseaWP = clusterProfiler::setReadable(gseaWP, 'org.Mm.eg.db',
-                                                keyType = "ENTREZID")
-    gsea_output[["WikiPathways"]] = gseaWP@result
-    
-    addWorksheet(gsea_wb_list[[i]], "GSEA_WP")
-    writeData(gsea_wb_list[[i]], "GSEA_WP", as.data.frame(gseaWP@result))
+    if (nrow(gseaWP) > 0) {
+      gseaWP = clusterProfiler::setReadable(gseaWP, 'org.Mm.eg.db',
+                                            keyType = "ENTREZID")
+      gsea_output[["WikiPathways"]] = gseaWP@result
+      
+      addWorksheet(gsea_wb_list[[i]], "GSEA_WP")
+      writeData(gsea_wb_list[[i]], "GSEA_WP", as.data.frame(gseaWP@result))
+    }
   }
-  
   
   # DO analysis (Disease Enrichment)
   RNGversion("4.2.2")
   set.seed(123)
-  gseaDO = DOSE::gseDO(geneList = gene_list_entrez,
+  gseaDO = suppressWarnings(DOSE::gseDO(geneList = gene_list_entrez,
                        pvalueCutoff = 0.05,
                        pAdjustMethod = "BH",
                        minGSSize = 3,
                        maxGSSize = 800,
-                       seed = TRUE)
+                       seed = TRUE))
   
   if (exists("gseaDO")) {
-    gseaDO = clusterProfiler::setReadable(gseaDO, 'org.Mm.eg.db',
-                                          keyType = "ENTREZID")
-    gsea_output[["Disease Ontology"]] = gseaDO@result
-    
-    addWorksheet(gsea_wb_list[[i]], "GSEA_DO")
-    writeData(gsea_wb_list[[i]], "GSEA_DO", as.data.frame(gseaDO@result))
+    if (nrow(gseaDO) > 0) {
+      gseaDO = clusterProfiler::setReadable(gseaDO, 'org.Mm.eg.db',
+                                            keyType = "ENTREZID")
+      gsea_output[["Disease Ontology"]] = gseaDO@result
+      
+      addWorksheet(gsea_wb_list[[i]], "GSEA_DO")
+      writeData(gsea_wb_list[[i]], "GSEA_DO", as.data.frame(gseaDO@result))
+    }
   }
   
   # DO in the Network Cancer Gene
   # http://ncg.kcl.ac.uk/
-  RNGversion("4.2.2")
-  set.seed(123)
-  gseaNCG = DOSE::gseNCG(geneList = gene_list_entrez,
-                         pvalueCutoff = 0.05,
-                         pAdjustMethod = "BH",
-                         minGSSize = 3,
-                         maxGSSize = 800,
-                         seed = TRUE)
-  
-  if (exists("gseaNCG")) {
-    gseaNCG = clusterProfiler::setReadable(gseaNCG, 'org.Mm.eg.db',
-                                           keyType = "ENTREZID")
-    gsea_output[["Network Cancer Gene (NCG)"]] = gseaNCG@result
-    
-    addWorksheet(gsea_wb_list[[i]], "GSEA_NCG")
-    writeData(gsea_wb_list[[i]], "GSEA_NCG", as.data.frame(gseaNCG@result))
-  }
+  # RNGversion("4.2.2")
+  # set.seed(123)
+  # gseaNCG = suppressWarnings(DOSE::gseNCG(geneList = gene_list_entrez,
+  #                       pvalueCutoff = 0.05,
+  #                       pAdjustMethod = "BH",
+  #                       minGSSize = 3,
+  #                       maxGSSize = 800,
+  #                       seed = TRUE))
+  #
+  # if (exists("gseaNCG")) {
+  #  if (nrow(gseaNCG) > 0) {
+  #    gseaNCG = clusterProfiler::setReadable(gseaNCG, 'org.Mm.eg.db',
+  #                                           keyType = "ENTREZID")
+  #    gsea_output[["Network Cancer Gene (NCG)"]] = gseaNCG@result
+  #    
+  #    addWorksheet(gsea_wb_list[[i]], "GSEA_NCG")
+  #    writeData(gsea_wb_list[[i]], "GSEA_NCG", as.data.frame(gseaNCG@result))
+  #  }
+  #}
   
   # DO in the Disease Gene Network (DisGeNET)
   # http://disgenet.org/
-  RNGversion("4.2.2")
-  set.seed(123)
-  gseaDGN = DOSE::gseDGN(geneList = gene_list_entrez,
-                         pvalueCutoff = 0.05,
-                         pAdjustMethod = "BH",
-                         minGSSize = 3,
-                         maxGSSize = 800,
-                         seed = TRUE)
+  # RNGversion("4.2.2")
+  # set.seed(123)
+  # gseaDGN = suppressWarnings(DOSE::gseDGN(geneList = gene_list_entrez,
+  #                       pvalueCutoff = 0.05,
+  #                       pAdjustMethod = "BH",
+  #                       minGSSize = 3,
+  #                       maxGSSize = 800,
+  #                       seed = TRUE))
   
-  if (exists("gseaDGN")) {
-    gseaDGN = clusterProfiler::setReadable(gseaDGN, 'org.Mm.eg.db',
-                                           keyType = "ENTREZID")
-    gsea_output[["Disease Gene Network (DisGeNET)"]] = gseaDGN@result
-    
-    addWorksheet(gsea_wb_list[[i]], "GSEA_DGN")
-    writeData(gsea_wb_list[[i]], "GSEA_DGN", as.data.frame(gseaDGN@result))
-  }
+  # if (exists("gseaDGN")) {
+  #  if (nrow(gseaDGN) > 0) {
+  #    gseaDGN = clusterProfiler::setReadable(gseaDGN, 'org.Mm.eg.db',
+  #                                           keyType = "ENTREZID")
+  #    gsea_output[["Disease Gene Network (DisGeNET)"]] = gseaDGN@result
+  #    
+  #    addWorksheet(gsea_wb_list[[i]], "GSEA_DGN")
+  #    writeData(gsea_wb_list[[i]], "GSEA_DGN", as.data.frame(gseaDGN@result))
+  #  }
+  # }
   
   gsea_results[[i]] = gsea_output
   
@@ -248,7 +262,7 @@ for (i in 1:length(ashr_dgea)) {
   ora_output = list()
   
   # GO
-  oraGO = enrichGO(gene = names(gene_list),
+  oraGO = suppressWarnings(enrichGO(gene = names(gene_list),
                    ont = "ALL",
                    universe = ashr_dgea[[i]]$Gene.Symbol,
                    OrgDb = "org.Mm.eg.db",
@@ -258,18 +272,20 @@ for (i in 1:length(ashr_dgea)) {
                    pAdjustMethod = "BH",
                    minGSSize = 3,
                    maxGSSize = 800,
-                   pool = TRUE)
+                   pool = TRUE))
   
   if (exists("oraGO")) {
-    oraGO_q0.1 = oraGO@result %>% dplyr::filter(qvalue <= 0.1)
-    ora_output[["Gene Ontology"]] = oraGO@result
-    
-    addWorksheet(ora_wb_list[[i]], "ORA_GO")
-    writeData(ora_wb_list[[i]], "ORA_GO", as.data.frame(oraGO_q0.1))
+    if (nrow(oraGO) > 0) {
+      oraGO_q0.1 = oraGO@result %>% dplyr::filter(qvalue <= 0.1)
+      ora_output[["Gene Ontology"]] = oraGO@result
+      
+      addWorksheet(ora_wb_list[[i]], "ORA_GO")
+      writeData(ora_wb_list[[i]], "ORA_GO", as.data.frame(oraGO_q0.1))
+    }
   }
   
   # KEGG
-  oraKEGG = enrichKEGG(gene = names(gene_list_entrez),
+  oraKEGG = suppressWarnings(enrichKEGG(gene = names(gene_list_entrez),
                        universe = entrez_universe,
                        organism = "mmu",
                        keyType = "ncbi-geneid",
@@ -277,39 +293,42 @@ for (i in 1:length(ashr_dgea)) {
                        qvalueCutoff = 0.1,
                        pAdjustMethod = "BH",
                        minGSSize = 3,
-                       maxGSSize = 800)
+                       maxGSSize = 800))
   
   if (exists("oraKEGG")) {
-    oraKEGG = clusterProfiler::setReadable(oraKEGG, 'org.Mm.eg.db', keyType = "ENTREZID")
-    oraKEGG_q0.1 = oraKEGG@result %>% dplyr::filter(qvalue <= 0.1)
-    ora_output[["KEGG"]] = oraKEGG@result
-    
-    addWorksheet(ora_wb_list[[i]], "ORA_KEGG")
-    writeData(ora_wb_list[[i]], "ORA_KEGG", as.data.frame(oraKEGG_q0.1))
+    if (nrow(oraKEGG) > 0) {
+      oraKEGG = clusterProfiler::setReadable(oraKEGG, 'org.Mm.eg.db', keyType = "ENTREZID")
+      oraKEGG_q0.1 = oraKEGG@result %>% dplyr::filter(qvalue <= 0.1)
+      ora_output[["KEGG"]] = oraKEGG@result
+      
+      addWorksheet(ora_wb_list[[i]], "ORA_KEGG")
+      writeData(ora_wb_list[[i]], "ORA_KEGG", as.data.frame(oraKEGG_q0.1))
+    }
   }
   
-  
   # WikiPathways
-  oraWP = enrichWP(gene = names(gene_list_entrez),
+  oraWP = suppressWarnings(enrichWP(gene = names(gene_list_entrez),
                    universe = entrez_universe,
                    organism = "Mus musculus",
                    pvalueCutoff = 0.05,
                    qvalueCutoff = 0.1,
                    pAdjustMethod = "BH",
                    minGSSize = 3,
-                   maxGSSize = 800)
+                   maxGSSize = 800))
   
   if (exists("oraWP")) {
-    oraWP = clusterProfiler::setReadable(oraWP, 'org.Mm.eg.db', keyType = "ENTREZID")
-    oraWP_q0.1 = oraWP@result %>% dplyr::filter(qvalue <= 0.1)
-    ora_output[["WikiPathways"]] = oraWP@result
-    
-    addWorksheet(ora_wb_list[[i]], "ORA_WP")
-    writeData(ora_wb_list[[i]], "ORA_WP", as.data.frame(oraWP_q0.1))
+    if (nrow(oraWP) > 0) {
+      oraWP = clusterProfiler::setReadable(oraWP, 'org.Mm.eg.db', keyType = "ENTREZID")
+      oraWP_q0.1 = oraWP@result %>% dplyr::filter(qvalue <= 0.1)
+      ora_output[["WikiPathways"]] = oraWP@result
+      
+      addWorksheet(ora_wb_list[[i]], "ORA_WP")
+      writeData(ora_wb_list[[i]], "ORA_WP", as.data.frame(oraWP_q0.1))
+    }
   }
   
   # Reactome
-  oraReactome = enrichPathway(gene = names(gene_list_entrez),
+  oraReactome = suppressWarnings(enrichPathway(gene = names(gene_list_entrez),
                               universe = entrez_universe,
                               organism = "mouse",
                               pvalueCutoff = 0.05,
@@ -317,69 +336,77 @@ for (i in 1:length(ashr_dgea)) {
                               pAdjustMethod = "BH",
                               minGSSize = 3,
                               maxGSSize = 800,
-                              readable = TRUE)
+                              readable = TRUE))
   
   if (exists("oraReactome")) {
-    oraReactome_q0.1 = oraReactome@result %>% dplyr::filter(qvalue <= 0.1)
-    ora_output[["Reactome"]] = oraReactome@result
-    
-    addWorksheet(ora_wb_list[[i]], "ORA_Reactome")
-    writeData(ora_wb_list[[i]], "ORA_Reactome", as.data.frame(oraReactome_q0.1))
+    if (nrow(oraReactome) > 0) {
+      oraReactome_q0.1 = oraReactome@result %>% dplyr::filter(qvalue <= 0.1)
+      ora_output[["Reactome"]] = oraReactome@result
+      
+      addWorksheet(ora_wb_list[[i]], "ORA_Reactome")
+      writeData(ora_wb_list[[i]], "ORA_Reactome", as.data.frame(oraReactome_q0.1))
+    }
   }
   
   # DO
-  oraDO = DOSE::enrichDO(gene = names(gene_list_entrez),
-                         universe = entrez_universe,
-                         pvalueCutoff = 0.05,
-                         qvalueCutoff = 0.1,
-                         pAdjustMethod = "BH",
-                         minGSSize = 3,
-                         maxGSSize = 800,
-                         readable = TRUE)
+  # oraDO = suppressWarnings(DOSE::enrichDO(gene = names(gene_list_entrez),
+  #                       universe = entrez_universe,
+  #                       pvalueCutoff = 0.05,
+  #                       qvalueCutoff = 0.1,
+  #                       pAdjustMethod = "BH",
+  #                       minGSSize = 3,
+  #                       maxGSSize = 800,
+  #                       readable = TRUE))
   
-  if (exists("oraDO")) {
-    oraDO_q0.1 = oraDO@result %>% dplyr::filter(qvalue <= 0.1)
-    ora_output[["Disease Ontology"]] = oraDO@result
-    
-    addWorksheet(ora_wb_list[[i]], "ORA_DO")
-    writeData(ora_wb_list[[i]], "ORA_DO", as.data.frame(oraDO_q0.1))
-  }
+  #if (exists("oraDO")) {
+  #  if (nrow(oraDO) > 0) {
+  #    oraDO_q0.1 = oraDO@result %>% dplyr::filter(qvalue <= 0.1)
+  #    ora_output[["Disease Ontology"]] = oraDO@result
+  #    
+  #    addWorksheet(ora_wb_list[[i]], "ORA_DO")
+  #    writeData(ora_wb_list[[i]], "ORA_DO", as.data.frame(oraDO_q0.1))
+  #  }
+  #}
   
   # DO: NCG
-  oraNCG = DOSE::enrichNCG(gene = names(gene_list_entrez),
-                           universe = entrez_universe,
-                           pvalueCutoff = 0.05,
-                           qvalueCutoff = 0.1,
-                           pAdjustMethod = "BH",
-                           minGSSize = 3,
-                           maxGSSize = 800,
-                           readable = TRUE)
-  
-  if (exists("oraNCG")) {
-    oraNCG_q0.1 = oraNCG@result %>% dplyr::filter(qvalue <= 0.1)
-    ora_output[["Network Cancer Gene (NCG)"]] = oraNCG@result
-    
-    addWorksheet(ora_wb_list[[i]], "ORA_NCG")
-    writeData(ora_wb_list[[i]], "ORA_NCG", as.data.frame(oraNCG_q0.1))
-  }
+  #oraNCG = suppressWarnings(DOSE::enrichNCG(gene = names(gene_list_entrez),
+  #                         universe = entrez_universe,
+  #                         pvalueCutoff = 0.05,
+  #                         qvalueCutoff = 0.1,
+  #                         pAdjustMethod = "BH",
+  #                         minGSSize = 3,
+  #                         maxGSSize = 800,
+  #                         readable = TRUE))
+#  
+#  if (exists("oraNCG")) {
+#    if (nrow(oraNCG) > 0) {
+#      oraNCG_q0.1 = oraNCG@result %>% dplyr::filter(qvalue <= 0.1)
+#      ora_output[["Network Cancer Gene (NCG)"]] = oraNCG@result
+#      
+#      addWorksheet(ora_wb_list[[i]], "ORA_NCG")
+#      writeData(ora_wb_list[[i]], "ORA_NCG", as.data.frame(oraNCG_q0.1))
+#    }
+#  }
   
   # DO: DGN
-  oraDGN = DOSE::enrichDGN(gene = names(gene_list_entrez),
-                           universe = entrez_universe,
-                           pvalueCutoff = 0.05,
-                           qvalueCutoff = 0.1,
-                           pAdjustMethod = "BH",
-                           minGSSize = 3,
-                           maxGSSize = 800,
-                           readable = TRUE)
-  
-  if (exists("oraDGN")) {
-    oraDGN_q0.1 = oraDGN@result %>% dplyr::filter(qvalue <= 0.1)
-    ora_output[["Disease Gene Network (DisGeNET)"]] = oraDGN@result
-    
-    addWorksheet(ora_wb_list[[i]], "ORA_DGN")
-    writeData(ora_wb_list[[i]], "ORA_DGN", as.data.frame(oraDGN_q0.1))
-  }
+  #oraDGN = suppressWarnings(DOSE::enrichDGN(gene = names(gene_list_entrez),
+  #                         universe = entrez_universe,
+  #                         pvalueCutoff = 0.05,
+  #                         qvalueCutoff = 0.1,
+  #                         pAdjustMethod = "BH",
+  #                         minGSSize = 3,
+  #                         maxGSSize = 800,
+  #                         readable = TRUE))
+#  
+  #if (exists("oraDGN")) {
+  #  if (nrow(oraDGN) > 0) {
+  #    oraDGN_q0.1 = oraDGN@result %>% dplyr::filter(qvalue <= 0.1)
+  #    ora_output[["Disease Gene Network (DisGeNET)"]] = oraDGN@result
+  #    
+  #    addWorksheet(ora_wb_list[[i]], "ORA_DGN")
+  #    writeData(ora_wb_list[[i]], "ORA_DGN", as.data.frame(oraDGN_q0.1))
+  #  }
+  #}
   
   ora_results[[i]] = ora_output
   
@@ -391,9 +418,9 @@ for (i in 1:length(ashr_dgea)) {
                                         "/GSEA/GSEA_output_", names(ashr_dgea)[i]),
                overwrite = TRUE)
   
-  # Remove garbage
-  rm(list=setdiff(ls(), keepers))
-  
   # Keep track of the loop's progress
   cat(paste("Done with", names(ashr_dgea)[i], "\n"))
+  
+  # Remove garbage
+  rm(list=setdiff(ls(), keepers))
 }
