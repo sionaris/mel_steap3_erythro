@@ -72,7 +72,7 @@ R.utils::setOption("clusterProfiler.download.method","libcurl")
 # Objects to keep after every loop
 keepers = c("ashr_dgea", "gsea_wb_list", "ora_wb_list", "pathfindR_wb_list",
             "gsea_results", "ora_results", "pathfindR_results", "pathway_approaches",
-            "i")
+            "i", "keepers")
 
 # ORA and GSEA #####
 for (i in 1:length(ashr_dgea)) {
@@ -424,3 +424,1360 @@ for (i in 1:length(ashr_dgea)) {
   # Remove garbage
   rm(list=setdiff(ls(), keepers))
 }
+
+rm(i); gc()
+
+# Pathway analysis with pathfindR #####
+library(pathfindR)
+library(cowplot)
+
+# Visualisations of pathways have been moved to a folder outside the repository
+# due to large size and difficulties with uploading to GitHub
+gene_sets = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG", "Reactome")
+# axis_text_size = c(8, 5, 5, 5, 6, 8)
+
+# HMBA24h_vs_Control48h #####
+# Loading the input to pathfindR (the stage 1 vs normal topTable output):
+pathf_input_HMBA24h_vs_Control48h = ashr_dgea$HMBA24h_vs_Control48h %>%
+  dplyr::select(Gene.Symbol, log2FoldChange, padj) %>%
+  na.omit()
+
+# Preparing a pathfindR loop for enrichment analysis
+dirs_HMBA24h_vs_Control48h = paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", gene_sets)
+pathfindR_outputs_HMBA24h_vs_Control48h = list()
+
+RNGversion("4.2.2")
+set.seed(123)
+for (i in 1:length(dirs_HMBA24h_vs_Control48h)){
+  pathfindR_outputs_HMBA24h_vs_Control48h[[i]] = run_pathfindR(pathf_input_HMBA24h_vs_Control48h, gene_sets = gene_sets[i],
+                                                               p_val_threshold = 0.05, 
+                                                               output_dir = dirs_HMBA24h_vs_Control48h[i], min_gset_size = 10,
+                                                               max_gset_size = 300, adj_method = 'fdr',
+                                                               enrichment_threshold = 0.05,
+                                                               pin_name_path = 'Biogrid', search_method = 'GR',
+                                                               grMaxDepth = 1, grSearchDepth = 1,
+                                                               iterations = 10, n_processes = 10)
+  cat(paste0("Done with ", gene_sets[i], "\n"))
+}
+names(pathfindR_outputs_HMBA24h_vs_Control48h) = gene_sets
+
+# Perform hierarchical clustering on the results (average distance metric)
+# Not run for GO-BP and Reactome because the algorithm time complexity is O(n^3)
+
+cluster_names = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG", "Reactome")
+RNGversion("4.2.2")
+set.seed(123)
+clustered_results_HMBA24h_vs_Control48h = list()
+for (i in 1:length(cluster_names)){
+  clustered_results_HMBA24h_vs_Control48h[[i]] = cluster_enriched_terms(pathfindR_outputs_HMBA24h_vs_Control48h[[cluster_names[[i]]]],
+                                                                        method = "hierarchical")
+}
+names(clustered_results_HMBA24h_vs_Control48h) = cluster_names
+
+# BioCarta : The maximum average silhouette width was 0.17 for k = 60
+# GO-BP    : The maximum average silhouette width was 0.1 for k = 350
+# GO-CC    : The maximum average silhouette width was 0.12 for k = 150 
+# GO-MF    : The maximum average silhouette width was 0.11 for k = 150
+# KEGG     : The maximum average silhouette width was 0.12 for k = 80
+# Reactome : The maximum average silhouette width was 0.4 for k = 550
+
+# Wrapping the text of terms with too many characters in their description
+wrapped_pathfindR_outputs_HMBA24h_vs_Control48h = pathfindR_outputs_HMBA24h_vs_Control48h
+for (i in 1:length(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)){
+  wrapped_pathfindR_outputs_HMBA24h_vs_Control48h[[i]]$Term_Description = stringr::str_wrap(pathfindR_outputs_HMBA24h_vs_Control48h[[i]]$Term_Description, 
+                                                                                            width = 41)
+}
+rm(i)
+
+wrapped_clustered_pathfindR_outputs_HMBA24h_vs_Control48h = clustered_results_HMBA24h_vs_Control48h
+for (i in 1:length(wrapped_clustered_pathfindR_outputs_HMBA24h_vs_Control48h)){
+  wrapped_clustered_pathfindR_outputs_HMBA24h_vs_Control48h[[i]]$Term_Description = stringr::str_wrap(clustered_results_HMBA24h_vs_Control48h[[i]]$Term_Description, 
+                                                                                                      width = 41)
+}
+rm(i)
+
+comparisons = c("HMBA24h vs. Control48h", "HMBA48h vs. Control48h", 
+                "HMBA48h vs. HMBA24h", "HMBA72h vs. Control48h", 
+                "HMBA72h vs. HMBA24h", "HMBA72h vs. HMBA48h")
+names(comparisons) = c("HMBA24h_vs_Control48h", "HMBA48h_vs_Control48h", 
+                       "HMBA48h_vs_HMBA24h", "HMBA72h_vs_Control48h", 
+                       "HMBA72h_vs_HMBA24h", "HMBA72h_vs_HMBA48h")
+
+enrichment_dotplots_HMBA24h_vs_Control48h = list()
+cluster_enrichment_dotplots_HMBA24h_vs_Control48h = list()
+
+# Producing dotplots with the results
+for (i in 1:length(pathfindR_outputs_HMBA24h_vs_Control48h)){
+  # unclustered results
+  enrichment_dotplots_HMBA24h_vs_Control48h[[i]] = enrichment_chart(result_df = wrapped_pathfindR_outputs_HMBA24h_vs_Control48h[[i]],
+                                                                    top_terms = 10)+
+    scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
+    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
+          axis.text.y = element_text(color = "black", size = 14),
+          axis.text.x = element_text(color = "black", size = 14),
+          axis.title.x = element_text(size = 15, face = "bold"))+
+    labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i],
+                        " terms enrichment dotplot - (", comparisons["HMBA24h_vs_Control48h"], ")"))
+  tiff(paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/",
+              names(pathfindR_outputs_HMBA24h_vs_Control48h)[i], "_top10_dotplot.tiff"), 
+       width = 9600, height = 5400, res = 700, compression = "lzw")
+  print(enrichment_dotplots_HMBA24h_vs_Control48h[[i]])
+  dev.off()
+  
+  # clustered results
+  cluster_enrichment_dotplots_HMBA24h_vs_Control48h[[i]] = enrichment_chart(result_df = wrapped_clustered_pathfindR_outputs_HMBA24h_vs_Control48h[[names(pathfindR_outputs_HMBA24h_vs_Control48h)[i]]][clustered_results_HMBA24h_vs_Control48h[[names(pathfindR_outputs_HMBA24h_vs_Control48h)[i]]]$Status
+                                                                                                                                                                                                       == "Representative", ][1:10,],
+                                                                            top_terms = NULL,
+                                                                            plot_by_cluster = TRUE)+
+    scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
+    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
+          axis.text.y = element_text(color = "black", size = 12),
+          axis.text.x = element_text(color = "black", size = 14),
+          axis.title.x = element_text(size = 15, face = "bold"))+
+    labs(title = paste0("Top 10 clustered ", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i],
+                        " terms enrichment dotplot - (", comparisons["HMBA24h_vs_Control48h"], ")"))
+  tiff(paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/",
+              names(pathfindR_outputs_HMBA24h_vs_Control48h)[i], "_top10_dotplot_clustered.tiff"), 
+       width = 9600, height = 5400, res = 700, compression = "lzw")
+  print(cluster_enrichment_dotplots_HMBA24h_vs_Control48h[[i]])
+  dev.off()
+}
+
+names(enrichment_dotplots_HMBA24h_vs_Control48h) = names(pathfindR_outputs_HMBA24h_vs_Control48h)
+names(cluster_enrichment_dotplots_HMBA24h_vs_Control48h) = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG",
+                                                             "Reactome")
+
+# Write out results in a comprehensive .xlsx file
+wb = createWorkbook()
+addWorksheet(wb, "BioCarta")
+writeData(wb, "BioCarta", clustered_results_HMBA24h_vs_Control48h[["BioCarta"]])
+addWorksheet(wb, "GO-BP")
+writeData(wb, "GO-BP", clustered_results_HMBA24h_vs_Control48h[["GO-BP"]])
+addWorksheet(wb, "GO-CC")
+writeData(wb, "GO-CC", clustered_results_HMBA24h_vs_Control48h[["GO-CC"]])
+addWorksheet(wb, "GO-MF")
+writeData(wb, "GO-MF", clustered_results_HMBA24h_vs_Control48h[["GO-MF"]])
+addWorksheet(wb, "KEGG")
+writeData(wb, "KEGG", clustered_results_HMBA24h_vs_Control48h[["KEGG"]])
+addWorksheet(wb, "Reactome")
+writeData(wb, "Reactome", clustered_results_HMBA24h_vs_Control48h[["Reactome"]])
+saveWorkbook(wb, file = "Pathways/HMBA24h_vs_Control48h/pathfindR/Comprehensive_pathfindR_output.xlsx",
+             overwrite = TRUE); rm(wb)
+
+# Representative terms output file (BioCarta, GO-CC, GO-MF & KEGG)
+wb2 = createWorkbook()
+addWorksheet(wb2, "BioCarta - rep")
+writeData(wb2, "BioCarta - rep", clustered_results_HMBA24h_vs_Control48h[["BioCarta"]][clustered_results_HMBA24h_vs_Control48h[["BioCarta"]]$Status
+                                                                                       == "Representative", ])
+addWorksheet(wb2, "GOBP - rep")
+writeData(wb2, "GOBP - rep", clustered_results_HMBA24h_vs_Control48h[["GO-BP"]][clustered_results_HMBA24h_vs_Control48h[["GO-BP"]]$Status
+                                                                                == "Representative", ])
+addWorksheet(wb2, "GOCC - rep")
+writeData(wb2, "GOCC - rep", clustered_results_HMBA24h_vs_Control48h[["GO-CC"]][clustered_results_HMBA24h_vs_Control48h[["GO-CC"]]$Status
+                                                                                == "Representative", ])
+addWorksheet(wb2, "GOMF - rep")
+writeData(wb2, "GOMF - rep", clustered_results_HMBA24h_vs_Control48h[["GO-MF"]][clustered_results_HMBA24h_vs_Control48h[["GO-MF"]]$Status
+                                                                                == "Representative", ])
+addWorksheet(wb2, "KEGG - rep")
+writeData(wb2, "KEGG - rep", clustered_results_HMBA24h_vs_Control48h[["KEGG"]][clustered_results_HMBA24h_vs_Control48h[["KEGG"]]$Status
+                                                                               == "Representative", ])
+addWorksheet(wb2, "Reactome - rep")
+writeData(wb2, "Reactome - rep", clustered_results_HMBA24h_vs_Control48h[["Reactome"]][clustered_results_HMBA24h_vs_Control48h[["Reactome"]]$Status
+                                                                                       == "Representative", ])
+saveWorkbook(wb2, file = "Pathways/HMBA24h_vs_Control48h/pathfindR/Representative_terms.xlsx",
+             overwrite = TRUE); rm(wb2)
+
+# Term-gene heatmaps and term-gene graphs #####
+
+# Defining a legend alignment function 
+align_legend <- function(p, hjust = 0.5)
+{
+  # extract legend
+  g <- cowplot::plot_to_gtable(p)
+  grobs <- g$grobs
+  legend_index <- which(sapply(grobs, function(x) x$name) == "guide-box")
+  legend <- grobs[[legend_index]]
+  
+  # extract guides table
+  guides_index <- which(sapply(legend$grobs, function(x) x$name) == "layout")
+  
+  # there can be multiple guides within one legend box  
+  for (gi in guides_index) {
+    guides <- legend$grobs[[gi]]
+    
+    # add extra column for spacing
+    # guides$width[5] is the extra spacing from the end of the legend text
+    # to the end of the legend title. If we instead distribute it by `hjust:(1-hjust)` on
+    # both sides, we get an aligned legend
+    spacing <- guides$width[5]
+    guides <- gtable::gtable_add_cols(guides, hjust*spacing, 1)
+    guides$widths[6] <- (1-hjust)*spacing
+    title_index <- guides$layout$name == "title"
+    guides$layout$l[title_index] <- 2
+    
+    # reconstruct guides and write back
+    legend$grobs[[gi]] <- guides
+  }
+  
+  # reconstruct legend and write back
+  g$grobs[[legend_index]] <- legend
+  g
+}
+
+term_gene_heatmaps_HMBA24h_vs_Control48h = list()
+term_gene_graphs_HMBA24h_vs_Control48h = list()
+
+for (i in 1:length(pathfindR_outputs_HMBA24h_vs_Control48h)){
+  # term-gene heatmaps
+  term_gene_heatmaps_HMBA24h_vs_Control48h[[i]] = term_gene_heatmap(result_df = wrapped_pathfindR_outputs_HMBA24h_vs_Control48h[[i]],
+                                                                    genes_df = pathf_input_HMBA24h_vs_Control48h,
+                                                                    num_terms = 5,
+                                                                    use_description = TRUE,
+                                                                    low = "darkgreen",
+                                                                    high = "darkred",
+                                                                    mid = "black")+
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
+          axis.text.x = element_text(size = axis_text_size[i], vjust = 0.5, color = "black"),
+          axis.text.y = element_text(size = 13),
+          legend.title = element_text(size = 13),
+          legend.title.align = 0.5,
+          legend.direction = "vertical") +
+    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], 
+                        " terms - differentially expressed genes heatmap (",
+                        comparisons["HMBA24h_vs_Control48h"], ")"),
+         fill = expression(log[2] ~ "FoldChange"))
+  tiff(paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "_top5_term_gene_heatmap.tiff"), 
+       width = 17920, height = 3024, res = 700, compression = "lzw")
+  print(ggdraw(align_legend(term_gene_heatmaps_HMBA24h_vs_Control48h[[i]], hjust = 0.5)))
+  dev.off()
+  
+  # term-gene graphs
+  term_gene_graphs_HMBA24h_vs_Control48h[[i]] = term_gene_graph(result_df = pathfindR_outputs_HMBA24h_vs_Control48h[[i]],
+                                                                num_terms = 3,
+                                                                use_description = TRUE,
+                                                                node_size = "p_val")+
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
+          plot.subtitle = element_text(size = 15, face = "bold", hjust = 0.5, vjust = 0.5),
+          legend.title = element_text(size = 15),
+          legend.title.align = 0.5,
+          legend.direction = "vertical",
+          legend.text = element_text(size = 13))+
+    labs(title = paste0("Top 3 ", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], 
+                        " term - gene graph (",
+                        comparisons["HMBA24h_vs_Control48h"], ")"),
+         fill = expression(log[2] ~ "FoldChange"))
+  tiff(paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "_top3_term_gene_graph.tiff"), 
+       width = 1920*7, height = 1080*7, res = 700, compression ="lzw")
+  print(term_gene_graphs_HMBA24h_vs_Control48h[[i]])
+  dev.off()
+}
+
+# UpSet plots #####
+UpSet_plots_HMBA24h_vs_Control48h = list()
+for (i in 1:length(pathfindR_outputs_HMBA24h_vs_Control48h)){
+  # UpSet plot
+  UpSet_plots_HMBA24h_vs_Control48h[[i]] = UpSet_plot(result_df = wrapped_pathfindR_outputs_HMBA24h_vs_Control48h[[i]],
+                                                      genes_df = pathf_input_HMBA24h_vs_Control48h,
+                                                      num_terms = 5,
+                                                      use_description = TRUE,
+                                                      low = "darkgreen",
+                                                      high = "darkred",
+                                                      mid = "black")+
+    theme(axis.text.y = element_text(size = axis_text_size[[i]]))
+  tiff(paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "_top5_UpSet_plot.tiff"), 
+       width = 6740, height = 17920, res = 700, compression = "lzw")
+  print(UpSet_plots_HMBA24h_vs_Control48h[[i]])
+  dev.off()
+}
+
+names(term_gene_graphs_HMBA24h_vs_Control48h) = names(pathfindR_outputs_HMBA24h_vs_Control48h)
+names(term_gene_heatmaps_HMBA24h_vs_Control48h) = names(pathfindR_outputs_HMBA24h_vs_Control48h)
+names(UpSet_plots_HMBA24h_vs_Control48h) = names(pathfindR_outputs_HMBA24h_vs_Control48h)
+
+# HMBA48h_vs_Control48h #####
+# Loading the input to pathfindR (the stage 1 vs normal topTable output):
+pathf_input_HMBA48h_vs_Control48h = ashr_dgea$HMBA48h_vs_Control48h %>%
+  dplyr::select(Gene.Symbol, log2FoldChange, padj) %>%
+  na.omit()
+
+# Preparing a pathfindR loop for enrichment analysis
+dirs_HMBA48h_vs_Control48h = paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", gene_sets)
+pathfindR_outputs_HMBA48h_vs_Control48h = list()
+
+RNGversion("4.2.2")
+set.seed(123)
+for (i in 1:length(dirs_HMBA48h_vs_Control48h)){
+  pathfindR_outputs_HMBA48h_vs_Control48h[[i]] = run_pathfindR(pathf_input_HMBA48h_vs_Control48h, gene_sets = gene_sets[i],
+                                                               p_val_threshold = 0.05, 
+                                                               output_dir = dirs_HMBA48h_vs_Control48h[i], min_gset_size = 10,
+                                                               max_gset_size = 300, adj_method = 'fdr',
+                                                               enrichment_threshold = 0.05,
+                                                               pin_name_path = 'Biogrid', search_method = 'GR',
+                                                               grMaxDepth = 1, grSearchDepth = 1,
+                                                               iterations = 10, n_processes = 10)
+  cat(paste0("Done with ", gene_sets[i], "\n"))
+}
+names(pathfindR_outputs_HMBA48h_vs_Control48h) = gene_sets
+
+# Perform hierarchical clustering on the results (average distance metric)
+# Not run for GO-BP and Reactome because the algorithm time complexity is O(n^3)
+
+cluster_names = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG", "Reactome")
+RNGversion("4.2.2")
+set.seed(123)
+clustered_results_HMBA48h_vs_Control48h = list()
+for (i in 1:length(cluster_names)){
+  clustered_results_HMBA48h_vs_Control48h[[i]] = cluster_enriched_terms(pathfindR_outputs_HMBA48h_vs_Control48h[[cluster_names[[i]]]],
+                                                                        method = "hierarchical")
+}
+names(clustered_results_HMBA48h_vs_Control48h) = cluster_names
+
+# BioCarta : The maximum average silhouette width was 0.17 for k = 60
+# GO-BP    : The maximum average silhouette width was 0.1 for k = 350
+# GO-CC    : The maximum average silhouette width was 0.12 for k = 150 
+# GO-MF    : The maximum average silhouette width was 0.11 for k = 150
+# KEGG     : The maximum average silhouette width was 0.12 for k = 80
+
+# Wrapping the text of terms with too many characters in their description
+wrapped_pathfindR_outputs_HMBA48h_vs_Control48h = pathfindR_outputs_HMBA48h_vs_Control48h
+for (i in 1:length(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)){
+  wrapped_pathfindR_outputs_HMBA48h_vs_Control48h[[i]]$Term_Description = stringr::str_wrap(pathfindR_outputs_HMBA48h_vs_Control48h[[i]]$Term_Description, 
+                                                                                            width = 41)
+}
+rm(i)
+
+wrapped_clustered_pathfindR_outputs_HMBA48h_vs_Control48h = clustered_results_HMBA48h_vs_Control48h
+for (i in 1:length(wrapped_clustered_pathfindR_outputs_HMBA48h_vs_Control48h)){
+  wrapped_clustered_pathfindR_outputs_HMBA48h_vs_Control48h[[i]]$Term_Description = stringr::str_wrap(clustered_results_HMBA48h_vs_Control48h[[i]]$Term_Description, 
+                                                                                                      width = 41)
+}
+rm(i)
+
+enrichment_dotplots_HMBA48h_vs_Control48h = list()
+cluster_enrichment_dotplots_HMBA48h_vs_Control48h = list()
+
+# Producing dotplots with the results
+for (i in 1:length(pathfindR_outputs_HMBA48h_vs_Control48h)){
+  # unclustered results
+  enrichment_dotplots_HMBA48h_vs_Control48h[[i]] = enrichment_chart(result_df = wrapped_pathfindR_outputs_HMBA48h_vs_Control48h[[i]],
+                                                                    top_terms = 10)+
+    scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
+    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
+          axis.text.y = element_text(color = "black", size = 14),
+          axis.text.x = element_text(color = "black", size = 14),
+          axis.title.x = element_text(size = 15, face = "bold"))+
+    labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i],
+                        " terms enrichment dotplot - (", comparisons["HMBA48h_vs_Control48h"], ")"))
+  tiff(paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "/",
+              names(pathfindR_outputs_HMBA48h_vs_Control48h)[i], "_top10_dotplot.tiff"), 
+       width = 9600, height = 5400, res = 700, compression = "lzw")
+  print(enrichment_dotplots_HMBA48h_vs_Control48h[[i]])
+  dev.off()
+  
+  # clustered results
+  cluster_enrichment_dotplots_HMBA48h_vs_Control48h[[i]] = enrichment_chart(result_df = wrapped_clustered_pathfindR_outputs_HMBA48h_vs_Control48h[[names(pathfindR_outputs_HMBA48h_vs_Control48h)[i]]][clustered_results_HMBA48h_vs_Control48h[[names(pathfindR_outputs_HMBA48h_vs_Control48h)[i]]]$Status
+                                                                                                                                                                                                       == "Representative", ][1:10,],
+                                                                            top_terms = NULL,
+                                                                            plot_by_cluster = TRUE)+
+    scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
+    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
+          axis.text.y = element_text(color = "black", size = 12),
+          axis.text.x = element_text(color = "black", size = 14),
+          axis.title.x = element_text(size = 15, face = "bold"))+
+    labs(title = paste0("Top 10 clustered ", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i],
+                        " terms enrichment dotplot - (", comparisons["HMBA48h_vs_Control48h"], ")"))
+  tiff(paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "/",
+              names(pathfindR_outputs_HMBA48h_vs_Control48h)[i], "_top10_dotplot_clustered.tiff"), 
+       width = 9600, height = 5400, res = 700, compression = "lzw")
+  print(cluster_enrichment_dotplots_HMBA48h_vs_Control48h[[i]])
+  dev.off()
+}
+
+names(enrichment_dotplots_HMBA48h_vs_Control48h) = names(pathfindR_outputs_HMBA48h_vs_Control48h)
+names(cluster_enrichment_dotplots_HMBA48h_vs_Control48h) = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG",
+                                                             "Reactome")
+
+# Write out results in a comprehensive .xlsx file
+wb = createWorkbook()
+addWorksheet(wb, "BioCarta")
+writeData(wb, "BioCarta", clustered_results_HMBA48h_vs_Control48h[["BioCarta"]])
+addWorksheet(wb, "GO-BP")
+writeData(wb, "GO-BP", clustered_results_HMBA48h_vs_Control48h[["GO-BP"]])
+addWorksheet(wb, "GO-CC")
+writeData(wb, "GO-CC", clustered_results_HMBA48h_vs_Control48h[["GO-CC"]])
+addWorksheet(wb, "GO-MF")
+writeData(wb, "GO-MF", clustered_results_HMBA48h_vs_Control48h[["GO-MF"]])
+addWorksheet(wb, "KEGG")
+writeData(wb, "KEGG", clustered_results_HMBA48h_vs_Control48h[["KEGG"]])
+addWorksheet(wb, "Reactome")
+writeData(wb, "Reactome", clustered_results_HMBA48h_vs_Control48h[["Reactome"]])
+saveWorkbook(wb, file = "Pathways/HMBA48h_vs_Control48h/pathfindR/Comprehensive_pathfindR_output.xlsx",
+             overwrite = TRUE); rm(wb)
+
+# Representative terms output file (BioCarta, GO-CC, GO-MF & KEGG)
+wb2 = createWorkbook()
+addWorksheet(wb2, "BioCarta - rep")
+writeData(wb2, "BioCarta - rep", clustered_results_HMBA48h_vs_Control48h[["BioCarta"]][clustered_results_HMBA48h_vs_Control48h[["BioCarta"]]$Status
+                                                                                       == "Representative", ])
+addWorksheet(wb2, "GOBP - rep")
+writeData(wb2, "GOBP - rep", clustered_results_HMBA48h_vs_Control48h[["GO-BP"]][clustered_results_HMBA48h_vs_Control48h[["GO-BP"]]$Status
+                                                                                == "Representative", ])
+addWorksheet(wb2, "GOCC - rep")
+writeData(wb2, "GOCC - rep", clustered_results_HMBA48h_vs_Control48h[["GO-CC"]][clustered_results_HMBA48h_vs_Control48h[["GO-CC"]]$Status
+                                                                                == "Representative", ])
+addWorksheet(wb2, "GOMF - rep")
+writeData(wb2, "GOMF - rep", clustered_results_HMBA48h_vs_Control48h[["GO-MF"]][clustered_results_HMBA48h_vs_Control48h[["GO-MF"]]$Status
+                                                                                == "Representative", ])
+addWorksheet(wb2, "KEGG - rep")
+writeData(wb2, "KEGG - rep", clustered_results_HMBA48h_vs_Control48h[["KEGG"]][clustered_results_HMBA48h_vs_Control48h[["KEGG"]]$Status
+                                                                               == "Representative", ])
+addWorksheet(wb2, "Reactome - rep")
+writeData(wb2, "Reactome - rep", clustered_results_HMBA48h_vs_Control48h[["Reactome"]][clustered_results_HMBA48h_vs_Control48h[["Reactome"]]$Status
+                                                                                       == "Representative", ])
+saveWorkbook(wb2, file = "Pathways/HMBA48h_vs_Control48h/pathfindR/Representative_terms.xlsx",
+             overwrite = TRUE); rm(wb2)
+
+# Term-gene heatmaps and term-gene graphs #####
+term_gene_heatmaps_HMBA48h_vs_Control48h = list()
+term_gene_graphs_HMBA48h_vs_Control48h = list()
+
+for (i in 1:length(pathfindR_outputs_HMBA48h_vs_Control48h)){
+  # term-gene heatmaps
+  term_gene_heatmaps_HMBA48h_vs_Control48h[[i]] = term_gene_heatmap(result_df = wrapped_pathfindR_outputs_HMBA48h_vs_Control48h[[i]],
+                                                                    genes_df = pathf_input_HMBA48h_vs_Control48h,
+                                                                    num_terms = 5,
+                                                                    use_description = TRUE,
+                                                                    low = "darkgreen",
+                                                                    high = "darkred",
+                                                                    mid = "black")+
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
+          axis.text.x = element_text(size = axis_text_size[i], vjust = 0.5, color = "black"),
+          axis.text.y = element_text(size = 13),
+          legend.title = element_text(size = 13),
+          legend.title.align = 0.5,
+          legend.direction = "vertical") +
+    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], 
+                        " terms - differentially expressed genes heatmap (",
+                        comparisons["HMBA48h_vs_Control48h"], ")"),
+         fill = expression(log[2] ~ "FoldChange"))
+  tiff(paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "_top5_term_gene_heatmap.tiff"), 
+       width = 17920, height = 3024, res = 700, compression = "lzw")
+  print(ggdraw(align_legend(term_gene_heatmaps_HMBA48h_vs_Control48h[[i]], hjust = 0.5)))
+  dev.off()
+  
+  # term-gene graphs
+  term_gene_graphs_HMBA48h_vs_Control48h[[i]] = term_gene_graph(result_df = pathfindR_outputs_HMBA48h_vs_Control48h[[i]],
+                                                                num_terms = 3,
+                                                                use_description = TRUE,
+                                                                node_size = "p_val")+
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
+          plot.subtitle = element_text(size = 15, face = "bold", hjust = 0.5, vjust = 0.5),
+          legend.title = element_text(size = 15),
+          legend.title.align = 0.5,
+          legend.direction = "vertical",
+          legend.text = element_text(size = 13))+
+    labs(title = paste0("Top 3 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], 
+                        " term - gene graph (",
+                        comparisons["HMBA48h_vs_Control48h"], ")"),
+         fill = expression(log[2] ~ "FoldChange"))
+  tiff(paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "_top3_term_gene_graph.tiff"), 
+       width = 1920*7, height = 1080*7, res = 700, compression ="lzw")
+  print(term_gene_graphs_HMBA48h_vs_Control48h[[i]])
+  dev.off()
+}
+
+# UpSet plots #####
+UpSet_plots_HMBA48h_vs_Control48h = list()
+for (i in 1:length(pathfindR_outputs_HMBA48h_vs_Control48h)){
+  # UpSet plot
+  UpSet_plots_HMBA48h_vs_Control48h[[i]] = UpSet_plot(result_df = wrapped_pathfindR_outputs_HMBA48h_vs_Control48h[[i]],
+                                                      genes_df = pathf_input_HMBA48h_vs_Control48h,
+                                                      num_terms = 5,
+                                                      use_description = TRUE,
+                                                      low = "darkgreen",
+                                                      high = "darkred",
+                                                      mid = "black")+
+    theme(axis.text.y = element_text(size = axis_text_size[[i]]))
+  tiff(paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "_top5_UpSet_plot.tiff"), 
+       width = 6740, height = 17920, res = 700, compression = "lzw")
+  print(UpSet_plots_HMBA48h_vs_Control48h[[i]])
+  dev.off()
+}
+
+names(term_gene_graphs_HMBA48h_vs_Control48h) = names(pathfindR_outputs_HMBA48h_vs_Control48h)
+names(term_gene_heatmaps_HMBA48h_vs_Control48h) = names(pathfindR_outputs_HMBA48h_vs_Control48h)
+names(UpSet_plots_HMBA48h_vs_Control48h) = names(pathfindR_outputs_HMBA48h_vs_Control48h)
+
+# HMBA48h_vs_HMBA24h #####
+# Loading the input to pathfindR (the stage 1 vs normal topTable output):
+pathf_input_HMBA48h_vs_HMBA24h = ashr_dgea$HMBA48h_vs_HMBA24h %>%
+  dplyr::select(Gene.Symbol, log2FoldChange, padj) %>%
+  na.omit()
+
+# Preparing a pathfindR loop for enrichment analysis
+dirs_HMBA48h_vs_HMBA24h = paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", gene_sets)
+pathfindR_outputs_HMBA48h_vs_HMBA24h = list()
+
+RNGversion("4.2.2")
+set.seed(123)
+for (i in 1:length(dirs_HMBA48h_vs_HMBA24h)){
+  pathfindR_outputs_HMBA48h_vs_HMBA24h[[i]] = run_pathfindR(pathf_input_HMBA48h_vs_HMBA24h, gene_sets = gene_sets[i],
+                                                            p_val_threshold = 0.05, 
+                                                            output_dir = dirs_HMBA48h_vs_HMBA24h[i], min_gset_size = 10,
+                                                            max_gset_size = 300, adj_method = 'fdr',
+                                                            enrichment_threshold = 0.05,
+                                                            pin_name_path = 'Biogrid', search_method = 'GR',
+                                                            grMaxDepth = 1, grSearchDepth = 1,
+                                                            iterations = 10, n_processes = 10)
+  cat(paste0("Done with ", gene_sets[i], "\n"))
+}
+names(pathfindR_outputs_HMBA48h_vs_HMBA24h) = gene_sets
+
+# Perform hierarchical clustering on the results (average distance metric)
+# Not run for GO-BP and Reactome because the algorithm time complexity is O(n^3)
+
+cluster_names = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG", "Reactome")
+RNGversion("4.2.2")
+set.seed(123)
+clustered_results_HMBA48h_vs_HMBA24h = list()
+for (i in 1:length(cluster_names)){
+  clustered_results_HMBA48h_vs_HMBA24h[[i]] = cluster_enriched_terms(pathfindR_outputs_HMBA48h_vs_HMBA24h[[cluster_names[[i]]]],
+                                                                     method = "hierarchical")
+}
+names(clustered_results_HMBA48h_vs_HMBA24h) = cluster_names
+
+# BioCarta : The maximum average silhouette width was 0.17 for k = 60
+# GO-BP    : The maximum average silhouette width was 0.1 for k = 350
+# GO-CC    : The maximum average silhouette width was 0.12 for k = 150 
+# GO-MF    : The maximum average silhouette width was 0.11 for k = 150
+# KEGG     : The maximum average silhouette width was 0.12 for k = 80
+
+# Wrapping the text of terms with too many characters in their description
+wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h = pathfindR_outputs_HMBA48h_vs_HMBA24h
+for (i in 1:length(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)){
+  wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h[[i]]$Term_Description = stringr::str_wrap(pathfindR_outputs_HMBA48h_vs_HMBA24h[[i]]$Term_Description, 
+                                                                                         width = 41)
+}
+rm(i)
+
+wrapped_clustered_pathfindR_outputs_HMBA48h_vs_HMBA24h = clustered_results_HMBA48h_vs_HMBA24h
+for (i in 1:length(wrapped_clustered_pathfindR_outputs_HMBA48h_vs_HMBA24h)){
+  wrapped_clustered_pathfindR_outputs_HMBA48h_vs_HMBA24h[[i]]$Term_Description = stringr::str_wrap(clustered_results_HMBA48h_vs_HMBA24h[[i]]$Term_Description, 
+                                                                                                   width = 41)
+}
+rm(i)
+
+enrichment_dotplots_HMBA48h_vs_HMBA24h = list()
+cluster_enrichment_dotplots_HMBA48h_vs_HMBA24h = list()
+
+# Producing dotplots with the results
+for (i in 1:length(pathfindR_outputs_HMBA48h_vs_HMBA24h)){
+  # unclustered results
+  enrichment_dotplots_HMBA48h_vs_HMBA24h[[i]] = enrichment_chart(result_df = wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h[[i]],
+                                                                 top_terms = 10)+
+    scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
+    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
+          axis.text.y = element_text(color = "black", size = 14),
+          axis.text.x = element_text(color = "black", size = 14),
+          axis.title.x = element_text(size = 15, face = "bold"))+
+    labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i],
+                        " terms enrichment dotplot - (", comparisons["HMBA48h_vs_HMBA24h"], ")"))
+  tiff(paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "/",
+              names(pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "_top10_dotplot.tiff"), 
+       width = 9600, height = 5400, res = 700, compression = "lzw")
+  print(enrichment_dotplots_HMBA48h_vs_HMBA24h[[i]])
+  dev.off()
+  
+  # clustered results
+  cluster_enrichment_dotplots_HMBA48h_vs_HMBA24h[[i]] = enrichment_chart(result_df = wrapped_clustered_pathfindR_outputs_HMBA48h_vs_HMBA24h[[names(pathfindR_outputs_HMBA48h_vs_HMBA24h)[i]]][clustered_results_HMBA48h_vs_HMBA24h[[names(pathfindR_outputs_HMBA48h_vs_HMBA24h)[i]]]$Status
+                                                                                                                                                                                              == "Representative", ][1:10,],
+                                                                         top_terms = NULL,
+                                                                         plot_by_cluster = TRUE)+
+    scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
+    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
+          axis.text.y = element_text(color = "black", size = 12),
+          axis.text.x = element_text(color = "black", size = 14),
+          axis.title.x = element_text(size = 15, face = "bold"))+
+    labs(title = paste0("Top 10 clustered ", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i],
+                        " terms enrichment dotplot - (", comparisons["HMBA48h_vs_HMBA24h"], ")"))
+  tiff(paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "/",
+              names(pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "_top10_dotplot_clustered.tiff"), 
+       width = 9600, height = 5400, res = 700, compression = "lzw")
+  print(cluster_enrichment_dotplots_HMBA48h_vs_HMBA24h[[i]])
+  dev.off()
+}
+
+names(enrichment_dotplots_HMBA48h_vs_HMBA24h) = names(pathfindR_outputs_HMBA48h_vs_HMBA24h)
+names(cluster_enrichment_dotplots_HMBA48h_vs_HMBA24h) = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG",
+                                                          "Reactome")
+
+# Write out results in a comprehensive .xlsx file
+wb = createWorkbook()
+addWorksheet(wb, "BioCarta")
+writeData(wb, "BioCarta", clustered_results_HMBA48h_vs_HMBA24h[["BioCarta"]])
+addWorksheet(wb, "GO-BP")
+writeData(wb, "GO-BP", clustered_results_HMBA48h_vs_HMBA24h[["GO-BP"]])
+addWorksheet(wb, "GO-CC")
+writeData(wb, "GO-CC", clustered_results_HMBA48h_vs_HMBA24h[["GO-CC"]])
+addWorksheet(wb, "GO-MF")
+writeData(wb, "GO-MF", clustered_results_HMBA48h_vs_HMBA24h[["GO-MF"]])
+addWorksheet(wb, "KEGG")
+writeData(wb, "KEGG", clustered_results_HMBA48h_vs_HMBA24h[["KEGG"]])
+addWorksheet(wb, "Reactome")
+writeData(wb, "Reactome", clustered_results_HMBA48h_vs_HMBA24h[["Reactome"]])
+saveWorkbook(wb, file = "Pathways/HMBA48h_vs_HMBA24h/pathfindR/Comprehensive_pathfindR_output.xlsx",
+             overwrite = TRUE); rm(wb)
+
+# Representative terms output file (BioCarta, GO-CC, GO-MF & KEGG)
+wb2 = createWorkbook()
+addWorksheet(wb2, "BioCarta - rep")
+writeData(wb2, "BioCarta - rep", clustered_results_HMBA48h_vs_HMBA24h[["BioCarta"]][clustered_results_HMBA48h_vs_HMBA24h[["BioCarta"]]$Status
+                                                                                    == "Representative", ])
+addWorksheet(wb2, "GOBP - rep")
+writeData(wb2, "GOBP - rep", clustered_results_HMBA48h_vs_HMBA24h[["GO-BP"]][clustered_results_HMBA48h_vs_HMBA24h[["GO-BP"]]$Status
+                                                                             == "Representative", ])
+addWorksheet(wb2, "GOCC - rep")
+writeData(wb2, "GOCC - rep", clustered_results_HMBA48h_vs_HMBA24h[["GO-CC"]][clustered_results_HMBA48h_vs_HMBA24h[["GO-CC"]]$Status
+                                                                             == "Representative", ])
+addWorksheet(wb2, "GOMF - rep")
+writeData(wb2, "GOMF - rep", clustered_results_HMBA48h_vs_HMBA24h[["GO-MF"]][clustered_results_HMBA48h_vs_HMBA24h[["GO-MF"]]$Status
+                                                                             == "Representative", ])
+addWorksheet(wb2, "KEGG - rep")
+writeData(wb2, "KEGG - rep", clustered_results_HMBA48h_vs_HMBA24h[["KEGG"]][clustered_results_HMBA48h_vs_HMBA24h[["KEGG"]]$Status
+                                                                            == "Representative", ])
+addWorksheet(wb2, "Reactome - rep")
+writeData(wb2, "Reactome - rep", clustered_results_HMBA48h_vs_HMBA24h[["Reactome"]][clustered_results_HMBA48h_vs_HMBA24h[["Reactome"]]$Status
+                                                                                    == "Representative", ])
+saveWorkbook(wb2, file = "Pathways/HMBA48h_vs_HMBA24h/pathfindR/Representative_terms.xlsx",
+             overwrite = TRUE); rm(wb2)
+
+# Term-gene heatmaps and term-gene graphs #####
+term_gene_heatmaps_HMBA48h_vs_HMBA24h = list()
+term_gene_graphs_HMBA48h_vs_HMBA24h = list()
+
+for (i in 1:length(pathfindR_outputs_HMBA48h_vs_HMBA24h)){
+  # term-gene heatmaps
+  term_gene_heatmaps_HMBA48h_vs_HMBA24h[[i]] = term_gene_heatmap(result_df = wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h[[i]],
+                                                                 genes_df = pathf_input_HMBA48h_vs_HMBA24h,
+                                                                 num_terms = 5,
+                                                                 use_description = TRUE,
+                                                                 low = "darkgreen",
+                                                                 high = "darkred",
+                                                                 mid = "black")+
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
+          axis.text.x = element_text(size = axis_text_size[i], vjust = 0.5, color = "black"),
+          axis.text.y = element_text(size = 13),
+          legend.title = element_text(size = 13),
+          legend.title.align = 0.5,
+          legend.direction = "vertical") +
+    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], 
+                        " terms - differentially expressed genes heatmap (",
+                        comparisons["HMBA48h_vs_HMBA24h"], ")"),
+         fill = expression(log[2] ~ "FoldChange"))
+  tiff(paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "_top5_term_gene_heatmap.tiff"), 
+       width = 17920, height = 3024, res = 700, compression = "lzw")
+  print(ggdraw(align_legend(term_gene_heatmaps_HMBA48h_vs_HMBA24h[[i]], hjust = 0.5)))
+  dev.off()
+  
+  # term-gene graphs
+  term_gene_graphs_HMBA48h_vs_HMBA24h[[i]] = term_gene_graph(result_df = pathfindR_outputs_HMBA48h_vs_HMBA24h[[i]],
+                                                             num_terms = 3,
+                                                             use_description = TRUE,
+                                                             node_size = "p_val")+
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
+          plot.subtitle = element_text(size = 15, face = "bold", hjust = 0.5, vjust = 0.5),
+          legend.title = element_text(size = 15),
+          legend.title.align = 0.5,
+          legend.direction = "vertical",
+          legend.text = element_text(size = 13))+
+    labs(title = paste0("Top 3 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], 
+                        " term - gene graph (",
+                        comparisons["HMBA48h_vs_HMBA24h"], ")"),
+         fill = expression(log[2] ~ "FoldChange"))
+  tiff(paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "_top3_term_gene_graph.tiff"), 
+       width = 1920*7, height = 1080*7, res = 700, compression ="lzw")
+  print(term_gene_graphs_HMBA48h_vs_HMBA24h[[i]])
+  dev.off()
+}
+
+# UpSet plots #####
+UpSet_plots_HMBA48h_vs_HMBA24h = list()
+for (i in 1:length(pathfindR_outputs_HMBA48h_vs_HMBA24h)){
+  # UpSet plot
+  UpSet_plots_HMBA48h_vs_HMBA24h[[i]] = UpSet_plot(result_df = wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h[[i]],
+                                                   genes_df = pathf_input_HMBA48h_vs_HMBA24h,
+                                                   num_terms = 5,
+                                                   use_description = TRUE,
+                                                   low = "darkgreen",
+                                                   high = "darkred",
+                                                   mid = "black")+
+    theme(axis.text.y = element_text(size = axis_text_size[[i]]))
+  tiff(paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "_top5_UpSet_plot.tiff"), 
+       width = 6740, height = 17920, res = 700, compression = "lzw")
+  print(UpSet_plots_HMBA48h_vs_HMBA24h[[i]])
+  dev.off()
+}
+
+names(term_gene_graphs_HMBA48h_vs_HMBA24h) = names(pathfindR_outputs_HMBA48h_vs_HMBA24h)
+names(term_gene_heatmaps_HMBA48h_vs_HMBA24h) = names(pathfindR_outputs_HMBA48h_vs_HMBA24h)
+names(UpSet_plots_HMBA48h_vs_HMBA24h) = names(pathfindR_outputs_HMBA48h_vs_HMBA24h)
+
+# HMBA72h_vs_Control48h #####
+# Loading the input to pathfindR (the stage 1 vs normal topTable output):
+pathf_input_HMBA72h_vs_Control48h = ashr_dgea$HMBA72h_vs_Control48h %>%
+  dplyr::select(Gene.Symbol, log2FoldChange, padj) %>%
+  na.omit()
+
+# Preparing a pathfindR loop for enrichment analysis
+dirs_HMBA72h_vs_Control48h = paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", gene_sets)
+pathfindR_outputs_HMBA72h_vs_Control48h = list()
+
+RNGversion("4.2.2")
+set.seed(123)
+for (i in 1:length(dirs_HMBA72h_vs_Control48h)){
+  pathfindR_outputs_HMBA72h_vs_Control48h[[i]] = run_pathfindR(pathf_input_HMBA72h_vs_Control48h, gene_sets = gene_sets[i],
+                                                               p_val_threshold = 0.05, 
+                                                               output_dir = dirs_HMBA72h_vs_Control48h[i], min_gset_size = 10,
+                                                               max_gset_size = 300, adj_method = 'fdr',
+                                                               enrichment_threshold = 0.05,
+                                                               pin_name_path = 'Biogrid', search_method = 'GR',
+                                                               grMaxDepth = 1, grSearchDepth = 1,
+                                                               iterations = 10, n_processes = 10)
+  cat(paste0("Done with ", gene_sets[i], "\n"))
+}
+names(pathfindR_outputs_HMBA72h_vs_Control48h) = gene_sets
+
+# Perform hierarchical clustering on the results (average distance metric)
+# Not run for GO-BP and Reactome because the algorithm time complexity is O(n^3)
+
+cluster_names = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG", "Reactome")
+RNGversion("4.2.2")
+set.seed(123)
+clustered_results_HMBA72h_vs_Control48h = list()
+for (i in 1:length(cluster_names)){
+  clustered_results_HMBA72h_vs_Control48h[[i]] = cluster_enriched_terms(pathfindR_outputs_HMBA72h_vs_Control48h[[cluster_names[[i]]]],
+                                                                        method = "hierarchical")
+}
+names(clustered_results_HMBA72h_vs_Control48h) = cluster_names
+
+# BioCarta : The maximum average silhouette width was 0.17 for k = 60
+# GO-BP    : The maximum average silhouette width was 0.1 for k = 350
+# GO-CC    : The maximum average silhouette width was 0.12 for k = 150 
+# GO-MF    : The maximum average silhouette width was 0.11 for k = 150
+# KEGG     : The maximum average silhouette width was 0.12 for k = 80
+
+# Wrapping the text of terms with too many characters in their description
+wrapped_pathfindR_outputs_HMBA72h_vs_Control48h = pathfindR_outputs_HMBA72h_vs_Control48h
+for (i in 1:length(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)){
+  wrapped_pathfindR_outputs_HMBA72h_vs_Control48h[[i]]$Term_Description = stringr::str_wrap(pathfindR_outputs_HMBA72h_vs_Control48h[[i]]$Term_Description, 
+                                                                                            width = 41)
+}
+rm(i)
+
+wrapped_clustered_pathfindR_outputs_HMBA72h_vs_Control48h = clustered_results_HMBA72h_vs_Control48h
+for (i in 1:length(wrapped_clustered_pathfindR_outputs_HMBA72h_vs_Control48h)){
+  wrapped_clustered_pathfindR_outputs_HMBA72h_vs_Control48h[[i]]$Term_Description = stringr::str_wrap(clustered_results_HMBA72h_vs_Control48h[[i]]$Term_Description, 
+                                                                                                      width = 41)
+}
+rm(i)
+
+enrichment_dotplots_HMBA72h_vs_Control48h = list()
+cluster_enrichment_dotplots_HMBA72h_vs_Control48h = list()
+
+# Producing dotplots with the results
+for (i in 1:length(pathfindR_outputs_HMBA72h_vs_Control48h)){
+  # unclustered results
+  enrichment_dotplots_HMBA72h_vs_Control48h[[i]] = enrichment_chart(result_df = wrapped_pathfindR_outputs_HMBA72h_vs_Control48h[[i]],
+                                                                    top_terms = 10)+
+    scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
+    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
+          axis.text.y = element_text(color = "black", size = 14),
+          axis.text.x = element_text(color = "black", size = 14),
+          axis.title.x = element_text(size = 15, face = "bold"))+
+    labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i],
+                        " terms enrichment dotplot - (", comparisons["HMBA72h_vs_Control48h"], ")"))
+  tiff(paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "/",
+              names(pathfindR_outputs_HMBA72h_vs_Control48h)[i], "_top10_dotplot.tiff"), 
+       width = 9600, height = 5400, res = 700, compression = "lzw")
+  print(enrichment_dotplots_HMBA72h_vs_Control48h[[i]])
+  dev.off()
+  
+  # clustered results
+  cluster_enrichment_dotplots_HMBA72h_vs_Control48h[[i]] = enrichment_chart(result_df = wrapped_clustered_pathfindR_outputs_HMBA72h_vs_Control48h[[names(pathfindR_outputs_HMBA72h_vs_Control48h)[i]]][clustered_results_HMBA72h_vs_Control48h[[names(pathfindR_outputs_HMBA72h_vs_Control48h)[i]]]$Status
+                                                                                                                                                                                                       == "Representative", ][1:10,],
+                                                                            top_terms = NULL,
+                                                                            plot_by_cluster = TRUE)+
+    scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
+    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
+          axis.text.y = element_text(color = "black", size = 12),
+          axis.text.x = element_text(color = "black", size = 14),
+          axis.title.x = element_text(size = 15, face = "bold"))+
+    labs(title = paste0("Top 10 clustered ", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i],
+                        " terms enrichment dotplot - (", comparisons["HMBA72h_vs_Control48h"], ")"))
+  tiff(paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "/",
+              names(pathfindR_outputs_HMBA72h_vs_Control48h)[i], "_top10_dotplot_clustered.tiff"), 
+       width = 9600, height = 5400, res = 700, compression = "lzw")
+  print(cluster_enrichment_dotplots_HMBA72h_vs_Control48h[[i]])
+  dev.off()
+}
+
+names(enrichment_dotplots_HMBA72h_vs_Control48h) = names(pathfindR_outputs_HMBA72h_vs_Control48h)
+names(cluster_enrichment_dotplots_HMBA72h_vs_Control48h) = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG",
+                                                             "Reactome")
+
+# Write out results in a comprehensive .xlsx file
+wb = createWorkbook()
+addWorksheet(wb, "BioCarta")
+writeData(wb, "BioCarta", clustered_results_HMBA72h_vs_Control48h[["BioCarta"]])
+addWorksheet(wb, "GO-BP")
+writeData(wb, "GO-BP", clustered_results_HMBA72h_vs_Control48h[["GO-BP"]])
+addWorksheet(wb, "GO-CC")
+writeData(wb, "GO-CC", clustered_results_HMBA72h_vs_Control48h[["GO-CC"]])
+addWorksheet(wb, "GO-MF")
+writeData(wb, "GO-MF", clustered_results_HMBA72h_vs_Control48h[["GO-MF"]])
+addWorksheet(wb, "KEGG")
+writeData(wb, "KEGG", clustered_results_HMBA72h_vs_Control48h[["KEGG"]])
+addWorksheet(wb, "Reactome")
+writeData(wb, "Reactome", clustered_results_HMBA72h_vs_Control48h[["Reactome"]])
+saveWorkbook(wb, file = "Pathways/HMBA72h_vs_Control48h/pathfindR/Comprehensive_pathfindR_output.xlsx",
+             overwrite = TRUE); rm(wb)
+
+# Representative terms output file (BioCarta, GO-CC, GO-MF & KEGG)
+wb2 = createWorkbook()
+addWorksheet(wb2, "BioCarta - rep")
+writeData(wb2, "BioCarta - rep", clustered_results_HMBA72h_vs_Control48h[["BioCarta"]][clustered_results_HMBA72h_vs_Control48h[["BioCarta"]]$Status
+                                                                                       == "Representative", ])
+addWorksheet(wb2, "GOBP - rep")
+writeData(wb2, "GOBP - rep", clustered_results_HMBA72h_vs_Control48h[["GO-BP"]][clustered_results_HMBA72h_vs_Control48h[["GO-BP"]]$Status
+                                                                                == "Representative", ])
+addWorksheet(wb2, "GOCC - rep")
+writeData(wb2, "GOCC - rep", clustered_results_HMBA72h_vs_Control48h[["GO-CC"]][clustered_results_HMBA72h_vs_Control48h[["GO-CC"]]$Status
+                                                                                == "Representative", ])
+addWorksheet(wb2, "GOMF - rep")
+writeData(wb2, "GOMF - rep", clustered_results_HMBA72h_vs_Control48h[["GO-MF"]][clustered_results_HMBA72h_vs_Control48h[["GO-MF"]]$Status
+                                                                                == "Representative", ])
+addWorksheet(wb2, "KEGG - rep")
+writeData(wb2, "KEGG - rep", clustered_results_HMBA72h_vs_Control48h[["KEGG"]][clustered_results_HMBA72h_vs_Control48h[["KEGG"]]$Status
+                                                                               == "Representative", ])
+addWorksheet(wb2, "Reactome - rep")
+writeData(wb2, "Reactome - rep", clustered_results_HMBA72h_vs_Control48h[["Reactome"]][clustered_results_HMBA72h_vs_Control48h[["Reactome"]]$Status
+                                                                                       == "Representative", ])
+saveWorkbook(wb2, file = "Pathways/HMBA72h_vs_Control48h/pathfindR/Representative_terms.xlsx",
+             overwrite = TRUE); rm(wb2)
+
+# Term-gene heatmaps and term-gene graphs #####
+term_gene_heatmaps_HMBA72h_vs_Control48h = list()
+term_gene_graphs_HMBA72h_vs_Control48h = list()
+
+for (i in 1:length(pathfindR_outputs_HMBA72h_vs_Control48h)){
+  # term-gene heatmaps
+  term_gene_heatmaps_HMBA72h_vs_Control48h[[i]] = term_gene_heatmap(result_df = wrapped_pathfindR_outputs_HMBA72h_vs_Control48h[[i]],
+                                                                    genes_df = pathf_input_HMBA72h_vs_Control48h,
+                                                                    num_terms = 5,
+                                                                    use_description = TRUE,
+                                                                    low = "darkgreen",
+                                                                    high = "darkred",
+                                                                    mid = "black")+
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
+          axis.text.x = element_text(size = axis_text_size[i], vjust = 0.5, color = "black"),
+          axis.text.y = element_text(size = 13),
+          legend.title = element_text(size = 13),
+          legend.title.align = 0.5,
+          legend.direction = "vertical") +
+    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], 
+                        " terms - differentially expressed genes heatmap (",
+                        comparisons["HMBA72h_vs_Control48h"], ")"),
+         fill = expression(log[2] ~ "FoldChange"))
+  tiff(paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "_top5_term_gene_heatmap.tiff"), 
+       width = 17920, height = 3024, res = 700, compression = "lzw")
+  print(ggdraw(align_legend(term_gene_heatmaps_HMBA72h_vs_Control48h[[i]], hjust = 0.5)))
+  dev.off()
+  
+  # term-gene graphs
+  term_gene_graphs_HMBA72h_vs_Control48h[[i]] = term_gene_graph(result_df = pathfindR_outputs_HMBA72h_vs_Control48h[[i]],
+                                                                num_terms = 3,
+                                                                use_description = TRUE,
+                                                                node_size = "p_val")+
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
+          plot.subtitle = element_text(size = 15, face = "bold", hjust = 0.5, vjust = 0.5),
+          legend.title = element_text(size = 15),
+          legend.title.align = 0.5,
+          legend.direction = "vertical",
+          legend.text = element_text(size = 13))+
+    labs(title = paste0("Top 3 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], 
+                        " term - gene graph (",
+                        comparisons["HMBA72h_vs_Control48h"], ")"),
+         fill = expression(log[2] ~ "FoldChange"))
+  tiff(paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "_top3_term_gene_graph.tiff"), 
+       width = 1920*7, height = 1080*7, res = 700, compression ="lzw")
+  print(term_gene_graphs_HMBA72h_vs_Control48h[[i]])
+  dev.off()
+}
+
+# UpSet plots #####
+UpSet_plots_HMBA72h_vs_Control48h = list()
+for (i in 1:length(pathfindR_outputs_HMBA72h_vs_Control48h)){
+  # UpSet plot
+  UpSet_plots_HMBA72h_vs_Control48h[[i]] = UpSet_plot(result_df = wrapped_pathfindR_outputs_HMBA72h_vs_Control48h[[i]],
+                                                      genes_df = pathf_input_HMBA72h_vs_Control48h,
+                                                      num_terms = 5,
+                                                      use_description = TRUE,
+                                                      low = "darkgreen",
+                                                      high = "darkred",
+                                                      mid = "black")+
+    theme(axis.text.y = element_text(size = axis_text_size[[i]]))
+  tiff(paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "_top5_UpSet_plot.tiff"), 
+       width = 6740, height = 17920, res = 700, compression = "lzw")
+  print(UpSet_plots_HMBA72h_vs_Control48h[[i]])
+  dev.off()
+}
+
+names(term_gene_graphs_HMBA72h_vs_Control48h) = names(pathfindR_outputs_HMBA72h_vs_Control48h)
+names(term_gene_heatmaps_HMBA72h_vs_Control48h) = names(pathfindR_outputs_HMBA72h_vs_Control48h)
+names(UpSet_plots_HMBA72h_vs_Control48h) = names(pathfindR_outputs_HMBA72h_vs_Control48h)
+
+# HMBA72h_vs_HMBA24h #####
+# Loading the input to pathfindR (the stage 1 vs normal topTable output):
+pathf_input_HMBA72h_vs_HMBA24h = ashr_dgea$HMBA72h_vs_HMBA24h %>%
+  dplyr::select(Gene.Symbol, log2FoldChange, padj) %>%
+  na.omit()
+
+# Preparing a pathfindR loop for enrichment analysis
+dirs_HMBA72h_vs_HMBA24h = paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", gene_sets)
+pathfindR_outputs_HMBA72h_vs_HMBA24h = list()
+
+RNGversion("4.2.2")
+set.seed(123)
+for (i in 1:length(dirs_HMBA72h_vs_HMBA24h)){
+  pathfindR_outputs_HMBA72h_vs_HMBA24h[[i]] = run_pathfindR(pathf_input_HMBA72h_vs_HMBA24h, gene_sets = gene_sets[i],
+                                                            p_val_threshold = 0.05, 
+                                                            output_dir = dirs_HMBA72h_vs_HMBA24h[i], min_gset_size = 10,
+                                                            max_gset_size = 300, adj_method = 'fdr',
+                                                            enrichment_threshold = 0.05,
+                                                            pin_name_path = 'Biogrid', search_method = 'GR',
+                                                            grMaxDepth = 1, grSearchDepth = 1,
+                                                            iterations = 10, n_processes = 10)
+  cat(paste0("Done with ", gene_sets[i], "\n"))
+}
+names(pathfindR_outputs_HMBA72h_vs_HMBA24h) = gene_sets
+
+# Perform hierarchical clustering on the results (average distance metric)
+# Not run for GO-BP and Reactome because the algorithm time complexity is O(n^3)
+
+cluster_names = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG", "Reactome")
+RNGversion("4.2.2")
+set.seed(123)
+clustered_results_HMBA72h_vs_HMBA24h = list()
+for (i in 1:length(cluster_names)){
+  clustered_results_HMBA72h_vs_HMBA24h[[i]] = cluster_enriched_terms(pathfindR_outputs_HMBA72h_vs_HMBA24h[[cluster_names[[i]]]],
+                                                                     method = "hierarchical")
+}
+names(clustered_results_HMBA72h_vs_HMBA24h) = cluster_names
+
+# BioCarta : The maximum average silhouette width was 0.17 for k = 60
+# GO-BP    : The maximum average silhouette width was 0.1 for k = 350
+# GO-CC    : The maximum average silhouette width was 0.12 for k = 150 
+# GO-MF    : The maximum average silhouette width was 0.11 for k = 150
+# KEGG     : The maximum average silhouette width was 0.12 for k = 80
+
+# Wrapping the text of terms with too many characters in their description
+wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h = pathfindR_outputs_HMBA72h_vs_HMBA24h
+for (i in 1:length(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)){
+  wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h[[i]]$Term_Description = stringr::str_wrap(pathfindR_outputs_HMBA72h_vs_HMBA24h[[i]]$Term_Description, 
+                                                                                         width = 41)
+}
+rm(i)
+
+wrapped_clustered_pathfindR_outputs_HMBA72h_vs_HMBA24h = clustered_results_HMBA72h_vs_HMBA24h
+for (i in 1:length(wrapped_clustered_pathfindR_outputs_HMBA72h_vs_HMBA24h)){
+  wrapped_clustered_pathfindR_outputs_HMBA72h_vs_HMBA24h[[i]]$Term_Description = stringr::str_wrap(clustered_results_HMBA72h_vs_HMBA24h[[i]]$Term_Description, 
+                                                                                                   width = 41)
+}
+rm(i)
+
+enrichment_dotplots_HMBA72h_vs_HMBA24h = list()
+cluster_enrichment_dotplots_HMBA72h_vs_HMBA24h = list()
+
+# Producing dotplots with the results
+for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA24h)){
+  # unclustered results
+  enrichment_dotplots_HMBA72h_vs_HMBA24h[[i]] = enrichment_chart(result_df = wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h[[i]],
+                                                                 top_terms = 10)+
+    scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
+    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
+          axis.text.y = element_text(color = "black", size = 14),
+          axis.text.x = element_text(color = "black", size = 14),
+          axis.title.x = element_text(size = 15, face = "bold"))+
+    labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i],
+                        " terms enrichment dotplot - (", comparisons["HMBA72h_vs_HMBA24h"], ")"))
+  tiff(paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "/",
+              names(pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "_top10_dotplot.tiff"), 
+       width = 9600, height = 5400, res = 700, compression = "lzw")
+  print(enrichment_dotplots_HMBA72h_vs_HMBA24h[[i]])
+  dev.off()
+  
+  # clustered results
+  cluster_enrichment_dotplots_HMBA72h_vs_HMBA24h[[i]] = enrichment_chart(result_df = wrapped_clustered_pathfindR_outputs_HMBA72h_vs_HMBA24h[[names(pathfindR_outputs_HMBA72h_vs_HMBA24h)[i]]][clustered_results_HMBA72h_vs_HMBA24h[[names(pathfindR_outputs_HMBA72h_vs_HMBA24h)[i]]]$Status
+                                                                                                                                                                                              == "Representative", ][1:10,],
+                                                                         top_terms = NULL,
+                                                                         plot_by_cluster = TRUE)+
+    scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
+    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
+          axis.text.y = element_text(color = "black", size = 12),
+          axis.text.x = element_text(color = "black", size = 14),
+          axis.title.x = element_text(size = 15, face = "bold"))+
+    labs(title = paste0("Top 10 clustered ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i],
+                        " terms enrichment dotplot - (", comparisons["HMBA72h_vs_HMBA24h"], ")"))
+  tiff(paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "/",
+              names(pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "_top10_dotplot_clustered.tiff"), 
+       width = 9600, height = 5400, res = 700, compression = "lzw")
+  print(cluster_enrichment_dotplots_HMBA72h_vs_HMBA24h[[i]])
+  dev.off()
+}
+
+names(enrichment_dotplots_HMBA72h_vs_HMBA24h) = names(pathfindR_outputs_HMBA72h_vs_HMBA24h)
+names(cluster_enrichment_dotplots_HMBA72h_vs_HMBA24h) = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG",
+                                                          "Reactome")
+
+# Write out results in a comprehensive .xlsx file
+wb = createWorkbook()
+addWorksheet(wb, "BioCarta")
+writeData(wb, "BioCarta", clustered_results_HMBA72h_vs_HMBA24h[["BioCarta"]])
+addWorksheet(wb, "GO-BP")
+writeData(wb, "GO-BP", clustered_results_HMBA72h_vs_HMBA24h[["GO-BP"]])
+addWorksheet(wb, "GO-CC")
+writeData(wb, "GO-CC", clustered_results_HMBA72h_vs_HMBA24h[["GO-CC"]])
+addWorksheet(wb, "GO-MF")
+writeData(wb, "GO-MF", clustered_results_HMBA72h_vs_HMBA24h[["GO-MF"]])
+addWorksheet(wb, "KEGG")
+writeData(wb, "KEGG", clustered_results_HMBA72h_vs_HMBA24h[["KEGG"]])
+addWorksheet(wb, "Reactome")
+writeData(wb, "Reactome", clustered_results_HMBA72h_vs_HMBA24h[["Reactome"]])
+saveWorkbook(wb, file = "Pathways/HMBA72h_vs_HMBA24h/pathfindR/Comprehensive_pathfindR_output.xlsx",
+             overwrite = TRUE); rm(wb)
+
+# Representative terms output file (BioCarta, GO-CC, GO-MF & KEGG)
+wb2 = createWorkbook()
+addWorksheet(wb2, "BioCarta - rep")
+writeData(wb2, "BioCarta - rep", clustered_results_HMBA72h_vs_HMBA24h[["BioCarta"]][clustered_results_HMBA72h_vs_HMBA24h[["BioCarta"]]$Status
+                                                                                    == "Representative", ])
+addWorksheet(wb2, "GOBP - rep")
+writeData(wb2, "GOBP - rep", clustered_results_HMBA72h_vs_HMBA24h[["GO-BP"]][clustered_results_HMBA72h_vs_HMBA24h[["GO-BP"]]$Status
+                                                                             == "Representative", ])
+addWorksheet(wb2, "GOCC - rep")
+writeData(wb2, "GOCC - rep", clustered_results_HMBA72h_vs_HMBA24h[["GO-CC"]][clustered_results_HMBA72h_vs_HMBA24h[["GO-CC"]]$Status
+                                                                             == "Representative", ])
+addWorksheet(wb2, "GOMF - rep")
+writeData(wb2, "GOMF - rep", clustered_results_HMBA72h_vs_HMBA24h[["GO-MF"]][clustered_results_HMBA72h_vs_HMBA24h[["GO-MF"]]$Status
+                                                                             == "Representative", ])
+addWorksheet(wb2, "KEGG - rep")
+writeData(wb2, "KEGG - rep", clustered_results_HMBA72h_vs_HMBA24h[["KEGG"]][clustered_results_HMBA72h_vs_HMBA24h[["KEGG"]]$Status
+                                                                            == "Representative", ])
+addWorksheet(wb2, "Reactome - rep")
+writeData(wb2, "Reactome - rep", clustered_results_HMBA72h_vs_HMBA24h[["Reactome"]][clustered_results_HMBA72h_vs_HMBA24h[["Reactome"]]$Status
+                                                                                    == "Representative", ])
+saveWorkbook(wb2, file = "Pathways/HMBA72h_vs_HMBA24h/pathfindR/Representative_terms.xlsx",
+             overwrite = TRUE); rm(wb2)
+
+# Term-gene heatmaps and term-gene graphs #####
+term_gene_heatmaps_HMBA72h_vs_HMBA24h = list()
+term_gene_graphs_HMBA72h_vs_HMBA24h = list()
+
+for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA24h)){
+  # term-gene heatmaps
+  term_gene_heatmaps_HMBA72h_vs_HMBA24h[[i]] = term_gene_heatmap(result_df = wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h[[i]],
+                                                                 genes_df = pathf_input_HMBA72h_vs_HMBA24h,
+                                                                 num_terms = 5,
+                                                                 use_description = TRUE,
+                                                                 low = "darkgreen",
+                                                                 high = "darkred",
+                                                                 mid = "black")+
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
+          axis.text.x = element_text(size = axis_text_size[i], vjust = 0.5, color = "black"),
+          axis.text.y = element_text(size = 13),
+          legend.title = element_text(size = 13),
+          legend.title.align = 0.5,
+          legend.direction = "vertical") +
+    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], 
+                        " terms - differentially expressed genes heatmap (",
+                        comparisons["HMBA72h_vs_HMBA24h"], ")"),
+         fill = expression(log[2] ~ "FoldChange"))
+  tiff(paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "_top5_term_gene_heatmap.tiff"), 
+       width = 17920, height = 3024, res = 700, compression = "lzw")
+  print(ggdraw(align_legend(term_gene_heatmaps_HMBA72h_vs_HMBA24h[[i]], hjust = 0.5)))
+  dev.off()
+  
+  # term-gene graphs
+  term_gene_graphs_HMBA72h_vs_HMBA24h[[i]] = term_gene_graph(result_df = pathfindR_outputs_HMBA72h_vs_HMBA24h[[i]],
+                                                             num_terms = 3,
+                                                             use_description = TRUE,
+                                                             node_size = "p_val")+
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
+          plot.subtitle = element_text(size = 15, face = "bold", hjust = 0.5, vjust = 0.5),
+          legend.title = element_text(size = 15),
+          legend.title.align = 0.5,
+          legend.direction = "vertical",
+          legend.text = element_text(size = 13))+
+    labs(title = paste0("Top 3 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], 
+                        " term - gene graph (",
+                        comparisons["HMBA72h_vs_HMBA24h"], ")"),
+         fill = expression(log[2] ~ "FoldChange"))
+  tiff(paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "_top3_term_gene_graph.tiff"), 
+       width = 1920*7, height = 1080*7, res = 700, compression ="lzw")
+  print(term_gene_graphs_HMBA72h_vs_HMBA24h[[i]])
+  dev.off()
+}
+
+# UpSet plots #####
+UpSet_plots_HMBA72h_vs_HMBA24h = list()
+for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA24h)){
+  # UpSet plot
+  UpSet_plots_HMBA72h_vs_HMBA24h[[i]] = UpSet_plot(result_df = wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h[[i]],
+                                                   genes_df = pathf_input_HMBA72h_vs_HMBA24h,
+                                                   num_terms = 5,
+                                                   use_description = TRUE,
+                                                   low = "darkgreen",
+                                                   high = "darkred",
+                                                   mid = "black")+
+    theme(axis.text.y = element_text(size = axis_text_size[[i]]))
+  tiff(paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "_top5_UpSet_plot.tiff"), 
+       width = 6740, height = 17920, res = 700, compression = "lzw")
+  print(UpSet_plots_HMBA72h_vs_HMBA24h[[i]])
+  dev.off()
+}
+
+names(term_gene_graphs_HMBA72h_vs_HMBA24h) = names(pathfindR_outputs_HMBA72h_vs_HMBA24h)
+names(term_gene_heatmaps_HMBA72h_vs_HMBA24h) = names(pathfindR_outputs_HMBA72h_vs_HMBA24h)
+names(UpSet_plots_HMBA72h_vs_HMBA24h) = names(pathfindR_outputs_HMBA72h_vs_HMBA24h)
+
+# HMBA72h_vs_HMBA48h #####
+# Loading the input to pathfindR (the stage 1 vs normal topTable output):
+pathf_input_HMBA72h_vs_HMBA48h = ashr_dgea$HMBA72h_vs_HMBA48h %>%
+  dplyr::select(Gene.Symbol, log2FoldChange, padj) %>%
+  na.omit()
+
+# Preparing a pathfindR loop for enrichment analysis
+dirs_HMBA72h_vs_HMBA48h = paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", gene_sets)
+pathfindR_outputs_HMBA72h_vs_HMBA48h = list()
+
+RNGversion("4.2.2")
+set.seed(123)
+for (i in 1:length(dirs_HMBA72h_vs_HMBA48h)){
+  pathfindR_outputs_HMBA72h_vs_HMBA48h[[i]] = run_pathfindR(pathf_input_HMBA72h_vs_HMBA48h, gene_sets = gene_sets[i],
+                                                            p_val_threshold = 0.05, 
+                                                            output_dir = dirs_HMBA72h_vs_HMBA48h[i], min_gset_size = 10,
+                                                            max_gset_size = 300, adj_method = 'fdr',
+                                                            enrichment_threshold = 0.05,
+                                                            pin_name_path = 'Biogrid', search_method = 'GR',
+                                                            grMaxDepth = 1, grSearchDepth = 1,
+                                                            iterations = 10, n_processes = 10)
+  cat(paste0("Done with ", gene_sets[i], "\n"))
+}
+names(pathfindR_outputs_HMBA72h_vs_HMBA48h) = gene_sets
+
+# Perform hierarchical clustering on the results (average distance metric)
+# Not run for GO-BP and Reactome because the algorithm time complexity is O(n^3)
+
+cluster_names = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG", "Reactome")
+RNGversion("4.2.2")
+set.seed(123)
+clustered_results_HMBA72h_vs_HMBA48h = list()
+for (i in 1:length(cluster_names)){
+  clustered_results_HMBA72h_vs_HMBA48h[[i]] = cluster_enriched_terms(pathfindR_outputs_HMBA72h_vs_HMBA48h[[cluster_names[[i]]]],
+                                                                     method = "hierarchical")
+}
+names(clustered_results_HMBA72h_vs_HMBA48h) = cluster_names
+
+# BioCarta : The maximum average silhouette width was 0.17 for k = 60
+# GO-BP    : The maximum average silhouette width was 0.1 for k = 350
+# GO-CC    : The maximum average silhouette width was 0.12 for k = 150 
+# GO-MF    : The maximum average silhouette width was 0.11 for k = 150
+# KEGG     : The maximum average silhouette width was 0.12 for k = 80
+
+# Wrapping the text of terms with too many characters in their description
+wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h = pathfindR_outputs_HMBA72h_vs_HMBA48h
+for (i in 1:length(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)){
+  wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h[[i]]$Term_Description = stringr::str_wrap(pathfindR_outputs_HMBA72h_vs_HMBA48h[[i]]$Term_Description, 
+                                                                                         width = 41)
+}
+rm(i)
+
+wrapped_clustered_pathfindR_outputs_HMBA72h_vs_HMBA48h = clustered_results_HMBA72h_vs_HMBA48h
+for (i in 1:length(wrapped_clustered_pathfindR_outputs_HMBA72h_vs_HMBA48h)){
+  wrapped_clustered_pathfindR_outputs_HMBA72h_vs_HMBA48h[[i]]$Term_Description = stringr::str_wrap(clustered_results_HMBA72h_vs_HMBA48h[[i]]$Term_Description, 
+                                                                                                   width = 41)
+}
+rm(i)
+
+enrichment_dotplots_HMBA72h_vs_HMBA48h = list()
+cluster_enrichment_dotplots_HMBA72h_vs_HMBA48h = list()
+
+# Producing dotplots with the results
+for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA48h)){
+  # unclustered results
+  enrichment_dotplots_HMBA72h_vs_HMBA48h[[i]] = enrichment_chart(result_df = wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h[[i]],
+                                                                 top_terms = 10)+
+    scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
+    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
+          axis.text.y = element_text(color = "black", size = 14),
+          axis.text.x = element_text(color = "black", size = 14),
+          axis.title.x = element_text(size = 15, face = "bold"))+
+    labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i],
+                        " terms enrichment dotplot - (", comparisons["HMBA72h_vs_HMBA48h"], ")"))
+  tiff(paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "/",
+              names(pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "_top10_dotplot.tiff"), 
+       width = 9600, height = 5400, res = 700, compression = "lzw")
+  print(enrichment_dotplots_HMBA72h_vs_HMBA48h[[i]])
+  dev.off()
+  
+  # clustered results
+  cluster_enrichment_dotplots_HMBA72h_vs_HMBA48h[[i]] = enrichment_chart(result_df = wrapped_clustered_pathfindR_outputs_HMBA72h_vs_HMBA48h[[names(pathfindR_outputs_HMBA72h_vs_HMBA48h)[i]]][clustered_results_HMBA72h_vs_HMBA48h[[names(pathfindR_outputs_HMBA72h_vs_HMBA48h)[i]]]$Status
+                                                                                                                                                                                              == "Representative", ][1:10,],
+                                                                         top_terms = NULL,
+                                                                         plot_by_cluster = TRUE)+
+    scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
+    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
+          axis.text.y = element_text(color = "black", size = 12),
+          axis.text.x = element_text(color = "black", size = 14),
+          axis.title.x = element_text(size = 15, face = "bold"))+
+    labs(title = paste0("Top 10 clustered ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i],
+                        " terms enrichment dotplot - (", comparisons["HMBA72h_vs_HMBA48h"], ")"))
+  tiff(paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "/",
+              names(pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "_top10_dotplot_clustered.tiff"), 
+       width = 9600, height = 5400, res = 700, compression = "lzw")
+  print(cluster_enrichment_dotplots_HMBA72h_vs_HMBA48h[[i]])
+  dev.off()
+}
+
+names(enrichment_dotplots_HMBA72h_vs_HMBA48h) = names(pathfindR_outputs_HMBA72h_vs_HMBA48h)
+names(cluster_enrichment_dotplots_HMBA72h_vs_HMBA48h) = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG",
+                                                          "Reactome")
+
+# Write out results in a comprehensive .xlsx file
+wb = createWorkbook()
+addWorksheet(wb, "BioCarta")
+writeData(wb, "BioCarta", clustered_results_HMBA72h_vs_HMBA48h[["BioCarta"]])
+addWorksheet(wb, "GO-BP")
+writeData(wb, "GO-BP", clustered_results_HMBA72h_vs_HMBA48h[["GO-BP"]])
+addWorksheet(wb, "GO-CC")
+writeData(wb, "GO-CC", clustered_results_HMBA72h_vs_HMBA48h[["GO-CC"]])
+addWorksheet(wb, "GO-MF")
+writeData(wb, "GO-MF", clustered_results_HMBA72h_vs_HMBA48h[["GO-MF"]])
+addWorksheet(wb, "KEGG")
+writeData(wb, "KEGG", clustered_results_HMBA72h_vs_HMBA48h[["KEGG"]])
+addWorksheet(wb, "Reactome")
+writeData(wb, "Reactome", clustered_results_HMBA72h_vs_HMBA48h[["Reactome"]])
+saveWorkbook(wb, file = "Pathways/HMBA72h_vs_HMBA48h/pathfindR/Comprehensive_pathfindR_output.xlsx",
+             overwrite = TRUE); rm(wb)
+
+# Representative terms output file (BioCarta, GO-CC, GO-MF & KEGG)
+wb2 = createWorkbook()
+addWorksheet(wb2, "BioCarta - rep")
+writeData(wb2, "BioCarta - rep", clustered_results_HMBA72h_vs_HMBA48h[["BioCarta"]][clustered_results_HMBA72h_vs_HMBA48h[["BioCarta"]]$Status
+                                                                                    == "Representative", ])
+addWorksheet(wb2, "GOBP - rep")
+writeData(wb2, "GOBP - rep", clustered_results_HMBA72h_vs_HMBA48h[["GO-BP"]][clustered_results_HMBA72h_vs_HMBA48h[["GO-BP"]]$Status
+                                                                             == "Representative", ])
+addWorksheet(wb2, "GOCC - rep")
+writeData(wb2, "GOCC - rep", clustered_results_HMBA72h_vs_HMBA48h[["GO-CC"]][clustered_results_HMBA72h_vs_HMBA48h[["GO-CC"]]$Status
+                                                                             == "Representative", ])
+addWorksheet(wb2, "GOMF - rep")
+writeData(wb2, "GOMF - rep", clustered_results_HMBA72h_vs_HMBA48h[["GO-MF"]][clustered_results_HMBA72h_vs_HMBA48h[["GO-MF"]]$Status
+                                                                             == "Representative", ])
+addWorksheet(wb2, "KEGG - rep")
+writeData(wb2, "KEGG - rep", clustered_results_HMBA72h_vs_HMBA48h[["KEGG"]][clustered_results_HMBA72h_vs_HMBA48h[["KEGG"]]$Status
+                                                                            == "Representative", ])
+addWorksheet(wb2, "Reactome - rep")
+writeData(wb2, "Reactome - rep", clustered_results_HMBA72h_vs_HMBA48h[["Reactome"]][clustered_results_HMBA72h_vs_HMBA48h[["Reactome"]]$Status
+                                                                                    == "Representative", ])
+saveWorkbook(wb2, file = "Pathways/HMBA72h_vs_HMBA48h/pathfindR/Representative_terms.xlsx",
+             overwrite = TRUE); rm(wb2)
+
+# Term-gene heatmaps and term-gene graphs #####
+term_gene_heatmaps_HMBA72h_vs_HMBA48h = list()
+term_gene_graphs_HMBA72h_vs_HMBA48h = list()
+
+for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA48h)){
+  # term-gene heatmaps
+  term_gene_heatmaps_HMBA72h_vs_HMBA48h[[i]] = term_gene_heatmap(result_df = wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h[[i]],
+                                                                 genes_df = pathf_input_HMBA72h_vs_HMBA48h,
+                                                                 num_terms = 5,
+                                                                 use_description = TRUE,
+                                                                 low = "darkgreen",
+                                                                 high = "darkred",
+                                                                 mid = "black")+
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
+          axis.text.x = element_text(size = axis_text_size[i], vjust = 0.5, color = "black"),
+          axis.text.y = element_text(size = 13),
+          legend.title = element_text(size = 13),
+          legend.title.align = 0.5,
+          legend.direction = "vertical") +
+    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], 
+                        " terms - differentially expressed genes heatmap (",
+                        comparisons["HMBA72h_vs_HMBA48h"], ")"),
+         fill = expression(log[2] ~ "FoldChange"))
+  tiff(paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "_top5_term_gene_heatmap.tiff"), 
+       width = 17920, height = 3024, res = 700, compression = "lzw")
+  print(ggdraw(align_legend(term_gene_heatmaps_HMBA72h_vs_HMBA48h[[i]], hjust = 0.5)))
+  dev.off()
+  
+  # term-gene graphs
+  term_gene_graphs_HMBA72h_vs_HMBA48h[[i]] = term_gene_graph(result_df = pathfindR_outputs_HMBA72h_vs_HMBA48h[[i]],
+                                                             num_terms = 3,
+                                                             use_description = TRUE,
+                                                             node_size = "p_val")+
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
+          plot.subtitle = element_text(size = 15, face = "bold", hjust = 0.5, vjust = 0.5),
+          legend.title = element_text(size = 15),
+          legend.title.align = 0.5,
+          legend.direction = "vertical",
+          legend.text = element_text(size = 13))+
+    labs(title = paste0("Top 3 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], 
+                        " term - gene graph (",
+                        comparisons["HMBA72h_vs_HMBA48h"], ")"),
+         fill = expression(log[2] ~ "FoldChange"))
+  tiff(paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "_top3_term_gene_graph.tiff"), 
+       width = 1920*7, height = 1080*7, res = 700, compression ="lzw")
+  print(term_gene_graphs_HMBA72h_vs_HMBA48h[[i]])
+  dev.off()
+}
+
+# UpSet plots #####
+UpSet_plots_HMBA72h_vs_HMBA48h = list()
+for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA48h)){
+  # UpSet plot
+  UpSet_plots_HMBA72h_vs_HMBA48h[[i]] = UpSet_plot(result_df = wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h[[i]],
+                                                   genes_df = pathf_input_HMBA72h_vs_HMBA48h,
+                                                   num_terms = 5,
+                                                   use_description = TRUE,
+                                                   low = "darkgreen",
+                                                   high = "darkred",
+                                                   mid = "black")+
+    theme(axis.text.y = element_text(size = axis_text_size[[i]]))
+  tiff(paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "/",
+              names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "_top5_UpSet_plot.tiff"), 
+       width = 6740, height = 17920, res = 700, compression = "lzw")
+  print(UpSet_plots_HMBA72h_vs_HMBA48h[[i]])
+  dev.off()
+}
+
+names(term_gene_graphs_HMBA72h_vs_HMBA48h) = names(pathfindR_outputs_HMBA72h_vs_HMBA48h)
+names(term_gene_heatmaps_HMBA72h_vs_HMBA48h) = names(pathfindR_outputs_HMBA72h_vs_HMBA48h)
+names(UpSet_plots_HMBA72h_vs_HMBA48h) = names(pathfindR_outputs_HMBA72h_vs_HMBA48h)
