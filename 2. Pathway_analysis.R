@@ -431,10 +431,134 @@ rm(i); gc()
 library(pathfindR)
 library(cowplot)
 
+# Preparation
+# For non-hsa organisms, PINs and gene sets must be downloaded
+
+# Get the mmu data (available in KEGG, Reactome, MSigDB)
+# KEGG is already available in pathfindR for mmu
+
+# MSigDB
+# BioCarta
+mmu_MSigDB_CP_BioCarta <- get_gene_sets_list(
+  source = "MSigDB",
+  species = "Mus musculus",
+  collection = "C2",
+  subcollection = "CP:BIOCARTA",
+)
+
+# Reactome
+mmu_MSigDB_CP_Reactome <- get_gene_sets_list(
+  source = "MSigDB",
+  species = "Mus musculus",
+  collection = "C2",
+  subcollection = "CP:REACTOME",
+)
+
+# WikiPathways
+mmu_MSigDB_CP_WikiPathways <- get_gene_sets_list(
+  source = "MSigDB",
+  species = "Mus musculus",
+  collection = "C2",
+  subcollection = "CP:WIKIPATHWAYS",
+)
+
+# GO-BP
+mmu_MSigDB_GO_BP <- get_gene_sets_list(
+  source = "MSigDB",
+  species = "Mus musculus",
+  collection = "C5",
+  subcollection = "GO:BP",
+)
+
+# GO-CC
+mmu_MSigDB_GO_CC <- get_gene_sets_list(
+  source = "MSigDB",
+  species = "Mus musculus",
+  collection = "C5",
+  subcollection = "GO:CC",
+)
+
+# GO-MF
+mmu_MSigDB_GO_MF <- get_gene_sets_list(
+  source = "MSigDB",
+  species = "Mus musculus",
+  collection = "C5",
+  subcollection = "GO:MF",
+)
+
+## Downloading the STRING PIN file to tempdir
+url <- "https://stringdb-downloads.org/download/protein.links.v12.0/10090.protein.links.v12.0.txt.gz"
+path2file <- file.path(tempdir(check = TRUE), "STRING.txt.gz")
+download.file(url, path2file)
+
+## read STRING pin file
+mmu_string_df <- read.table(path2file, header = TRUE)
+
+## filter using combined_score cut-off value of 800
+mmu_string_df <- mmu_string_df[mmu_string_df$combined_score >= 800, ]
+
+## fix ids
+mmu_string_pin <- data.frame(
+  Interactor_A = sub("^10090\\.", "", mmu_string_df$protein1),
+  Interactor_B = sub("^10090\\.", "", mmu_string_df$protein2)
+)
+head(mmu_string_pin, 2)
+
+# Convert Ensembl ID's to symbols
+library(biomaRt)
+
+mmu_ensembl <- useMart("ensembl", dataset = "mmusculus_gene_ensembl")
+
+converted <- getBM(
+  attributes = c("ensembl_peptide_id", "mgi_symbol"),
+  filters = "ensembl_peptide_id",
+  values = unique(unlist(mmu_string_pin)),
+  mart = mmu_ensembl
+)
+
+mmu_string_pin$Interactor_A <- converted$mgi_symbol[match(mmu_string_pin$Interactor_A, converted$ensembl_peptide_id)]
+mmu_string_pin$Interactor_B <- converted$mgi_symbol[match(mmu_string_pin$Interactor_B, converted$ensembl_peptide_id)]
+mmu_string_pin <- mmu_string_pin[!is.na(mmu_string_pin$Interactor_A) & !is.na(mmu_string_pin$Interactor_B), ]
+mmu_string_pin <- mmu_string_pin[mmu_string_pin$Interactor_A != "" & mmu_string_pin$Interactor_B != "", ]
+
+head(mmu_string_pin, 2)
+
+# remove self interactions
+self_intr_cond <- mmu_string_pin$Interactor_A == mmu_string_pin$Interactor_B
+mmu_string_pin <- mmu_string_pin[!self_intr_cond, ]
+
+# remove duplicated inteactions (including symmetric ones)
+mmu_string_pin <- unique(t(apply(mmu_string_pin, 1, sort))) # this will return a matrix object
+
+mmu_string_pin <- data.frame(
+  A = mmu_string_pin[, 1],
+  pp = "pp",
+  B = mmu_string_pin[, 2]
+)
+
+path2SIF <- file.path(tempdir(), "mmusculusPIN.sif")
+write.table(mmu_string_pin,
+            file = path2SIF,
+            col.names = FALSE,
+            row.names = FALSE,
+            sep = "\t",
+            quote = FALSE
+)
+path2SIF <- normalizePath(path2SIF)
+
 # Visualisations of pathways have been moved to a folder outside the repository
 # due to large size and difficulties with uploading to GitHub
-gene_sets = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG", "Reactome")
-# axis_text_size = c(8, 5, 5, 5, 6, 8)
+genes_of_gene_sets = list(mmu_MSigDB_CP_Reactome$gene_sets, mmu_MSigDB_CP_WikiPathways$gene_sets,
+                 mmu_MSigDB_GO_BP$gene_sets, mmu_MSigDB_GO_CC$gene_sets, mmu_MSigDB_GO_MF$gene_sets,
+                 mmu_MSigDB_CP_BioCarta$gene_sets, mmu_kegg_genes)
+descriptions_of_gene_sets = list(mmu_MSigDB_CP_Reactome$descriptions, mmu_MSigDB_CP_WikiPathways$descriptions,
+                                 mmu_MSigDB_GO_BP$descriptions, mmu_MSigDB_GO_CC$descriptions, mmu_MSigDB_GO_MF$descriptions,
+                                 mmu_MSigDB_CP_BioCarta$descriptions, mmu_kegg_descriptions)
+subdirs = names(genes_of_gene_sets) = names(descriptions_of_gene_sets) = 
+  c("MSigDB Reactome", "MSigDB WikiPathways", "MSigDB GO-Biological Processes", 
+    "MSigDB GO-Cellular Components", "MSigDB GO-Molecular Functions",
+    "MSigDB BioCarta", "KEGG")
+
 
 # HMBA24h_vs_Control48h #####
 # Loading the input to pathfindR (the stage 1 vs normal topTable output):
@@ -443,28 +567,30 @@ pathf_input_HMBA24h_vs_Control48h = ashr_dgea$HMBA24h_vs_Control48h %>%
   na.omit()
 
 # Preparing a pathfindR loop for enrichment analysis
-dirs_HMBA24h_vs_Control48h = paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", gene_sets)
+dirs_HMBA24h_vs_Control48h = paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", subdirs)
 pathfindR_outputs_HMBA24h_vs_Control48h = list()
 
 RNGversion("4.2.2")
 set.seed(123)
 for (i in 1:length(dirs_HMBA24h_vs_Control48h)){
-  pathfindR_outputs_HMBA24h_vs_Control48h[[i]] = run_pathfindR(pathf_input_HMBA24h_vs_Control48h, gene_sets = gene_sets[i],
-                                                               p_val_threshold = 0.05, 
+  pathfindR_outputs_HMBA24h_vs_Control48h[[i]] = run_pathfindR(pathf_input_HMBA24h_vs_Control48h, gene_sets = "Custom",
+                                                               p_val_threshold = 0.05, convert2alias = FALSE,
+                                                               custom_genes = genes_of_gene_sets[[i]],
+                                                               custom_descriptions = descriptions_of_gene_sets[[i]],
                                                                output_dir = dirs_HMBA24h_vs_Control48h[i], min_gset_size = 10,
                                                                max_gset_size = 300, adj_method = 'fdr',
                                                                enrichment_threshold = 0.05,
-                                                               pin_name_path = 'Biogrid', search_method = 'GR',
+                                                               pin_name_path = path2SIF, search_method = 'GR',
                                                                grMaxDepth = 1, grSearchDepth = 1,
                                                                iterations = 10, n_processes = 10)
-  cat(paste0("Done with ", gene_sets[i], "\n"))
+  cat(paste0("Done with ", subdirs[i], "\n"))
 }
-names(pathfindR_outputs_HMBA24h_vs_Control48h) = gene_sets
+names(pathfindR_outputs_HMBA24h_vs_Control48h) = subdirs
 
 # Perform hierarchical clustering on the results (average distance metric)
-# Not run for GO-BP and Reactome because the algorithm time complexity is O(n^3)
+# Bear in mind the algorithm time complexity is O(n^3)
 
-cluster_names = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG", "Reactome")
+cluster_names = subdirs
 RNGversion("4.2.2")
 set.seed(123)
 clustered_results_HMBA24h_vs_Control48h = list()
@@ -474,12 +600,13 @@ for (i in 1:length(cluster_names)){
 }
 names(clustered_results_HMBA24h_vs_Control48h) = cluster_names
 
-# BioCarta : The maximum average silhouette width was 0.17 for k = 60
-# GO-BP    : The maximum average silhouette width was 0.1 for k = 350
-# GO-CC    : The maximum average silhouette width was 0.12 for k = 150 
-# GO-MF    : The maximum average silhouette width was 0.11 for k = 150
-# KEGG     : The maximum average silhouette width was 0.12 for k = 80
-# Reactome : The maximum average silhouette width was 0.4 for k = 550
+# MSigDB Reactome     : The maximum average silhouette width was 0.35 for k = 100
+# MSigDB WikiPathways : The maximum average silhouette width was 0.12 for k = 90
+# MSigDB GO-BP        : The maximum average silhouette width was 0.4 for k = 400  
+# MSigDB GO-CC        : The maximum average silhouette width was 0.29 for k = 20
+# MSigDB GO-MF        : The maximum average silhouette width was 0.25 for k = 30
+# MSigDB BioCarta     : The maximum average silhouette width was 0.17 for k = 14 
+# KEGG                : The maximum average silhouette width was 0.16 for k = 2
 
 # Wrapping the text of terms with too many characters in their description
 wrapped_pathfindR_outputs_HMBA24h_vs_Control48h = pathfindR_outputs_HMBA24h_vs_Control48h
@@ -544,46 +671,28 @@ for (i in 1:length(pathfindR_outputs_HMBA24h_vs_Control48h)){
 }
 
 names(enrichment_dotplots_HMBA24h_vs_Control48h) = names(pathfindR_outputs_HMBA24h_vs_Control48h)
-names(cluster_enrichment_dotplots_HMBA24h_vs_Control48h) = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG",
-                                                             "Reactome")
+names(cluster_enrichment_dotplots_HMBA24h_vs_Control48h) = names(pathfindR_outputs_HMBA24h_vs_Control48h)
 
 # Write out results in a comprehensive .xlsx file
 wb = createWorkbook()
-addWorksheet(wb, "BioCarta")
-writeData(wb, "BioCarta", clustered_results_HMBA24h_vs_Control48h[["BioCarta"]])
-addWorksheet(wb, "GO-BP")
-writeData(wb, "GO-BP", clustered_results_HMBA24h_vs_Control48h[["GO-BP"]])
-addWorksheet(wb, "GO-CC")
-writeData(wb, "GO-CC", clustered_results_HMBA24h_vs_Control48h[["GO-CC"]])
-addWorksheet(wb, "GO-MF")
-writeData(wb, "GO-MF", clustered_results_HMBA24h_vs_Control48h[["GO-MF"]])
-addWorksheet(wb, "KEGG")
-writeData(wb, "KEGG", clustered_results_HMBA24h_vs_Control48h[["KEGG"]])
-addWorksheet(wb, "Reactome")
-writeData(wb, "Reactome", clustered_results_HMBA24h_vs_Control48h[["Reactome"]])
+for(i in 1:length(subdirs)) {
+  addWorksheet(wb, subdirs[i])
+  writeData(wb, subdirs[i], clustered_results_HMBA24h_vs_Control48h[[i]])
+}
 saveWorkbook(wb, file = "Pathways/HMBA24h_vs_Control48h/pathfindR/Comprehensive_pathfindR_output.xlsx",
              overwrite = TRUE); rm(wb)
 
-# Representative terms output file (BioCarta, GO-CC, GO-MF & KEGG)
+# Representative terms
+wb2_names = c("Reactome", "WikiPathways", "GO-Biological Processes", 
+              "GO-Cellular Components", "GO-Molecular Functions",
+              "BioCarta", "KEGG")
 wb2 = createWorkbook()
-addWorksheet(wb2, "BioCarta - rep")
-writeData(wb2, "BioCarta - rep", clustered_results_HMBA24h_vs_Control48h[["BioCarta"]][clustered_results_HMBA24h_vs_Control48h[["BioCarta"]]$Status
-                                                                                       == "Representative", ])
-addWorksheet(wb2, "GOBP - rep")
-writeData(wb2, "GOBP - rep", clustered_results_HMBA24h_vs_Control48h[["GO-BP"]][clustered_results_HMBA24h_vs_Control48h[["GO-BP"]]$Status
-                                                                                == "Representative", ])
-addWorksheet(wb2, "GOCC - rep")
-writeData(wb2, "GOCC - rep", clustered_results_HMBA24h_vs_Control48h[["GO-CC"]][clustered_results_HMBA24h_vs_Control48h[["GO-CC"]]$Status
-                                                                                == "Representative", ])
-addWorksheet(wb2, "GOMF - rep")
-writeData(wb2, "GOMF - rep", clustered_results_HMBA24h_vs_Control48h[["GO-MF"]][clustered_results_HMBA24h_vs_Control48h[["GO-MF"]]$Status
-                                                                                == "Representative", ])
-addWorksheet(wb2, "KEGG - rep")
-writeData(wb2, "KEGG - rep", clustered_results_HMBA24h_vs_Control48h[["KEGG"]][clustered_results_HMBA24h_vs_Control48h[["KEGG"]]$Status
-                                                                               == "Representative", ])
-addWorksheet(wb2, "Reactome - rep")
-writeData(wb2, "Reactome - rep", clustered_results_HMBA24h_vs_Control48h[["Reactome"]][clustered_results_HMBA24h_vs_Control48h[["Reactome"]]$Status
-                                                                                       == "Representative", ])
+for(i in 1:length(subdirs)) {
+  addWorksheet(wb2, paste0(wb2_names[i], " - rep"))
+  writeData(wb2, paste0(wb2_names[i], " - rep"), 
+            clustered_results_HMBA24h_vs_Control48h[[i]][clustered_results_HMBA24h_vs_Control48h[[i]]$Status
+                                                      == "Representative", ])
+}
 saveWorkbook(wb2, file = "Pathways/HMBA24h_vs_Control48h/pathfindR/Representative_terms.xlsx",
              overwrite = TRUE); rm(wb2)
 
@@ -704,28 +813,30 @@ pathf_input_HMBA48h_vs_Control48h = ashr_dgea$HMBA48h_vs_Control48h %>%
   na.omit()
 
 # Preparing a pathfindR loop for enrichment analysis
-dirs_HMBA48h_vs_Control48h = paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", gene_sets)
+dirs_HMBA48h_vs_Control48h = paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", subdirs)
 pathfindR_outputs_HMBA48h_vs_Control48h = list()
 
 RNGversion("4.2.2")
 set.seed(123)
 for (i in 1:length(dirs_HMBA48h_vs_Control48h)){
-  pathfindR_outputs_HMBA48h_vs_Control48h[[i]] = run_pathfindR(pathf_input_HMBA48h_vs_Control48h, gene_sets = gene_sets[i],
-                                                               p_val_threshold = 0.05, 
+  pathfindR_outputs_HMBA48h_vs_Control48h[[i]] = run_pathfindR(pathf_input_HMBA48h_vs_Control48h, gene_sets = "Custom",
+                                                               p_val_threshold = 0.05, convert2alias = FALSE,
+                                                               custom_genes = genes_of_gene_sets[[i]],
+                                                               custom_descriptions = descriptions_of_gene_sets[[i]],
                                                                output_dir = dirs_HMBA48h_vs_Control48h[i], min_gset_size = 10,
                                                                max_gset_size = 300, adj_method = 'fdr',
                                                                enrichment_threshold = 0.05,
-                                                               pin_name_path = 'Biogrid', search_method = 'GR',
+                                                               pin_name_path = path2SIF, search_method = 'GR',
                                                                grMaxDepth = 1, grSearchDepth = 1,
                                                                iterations = 10, n_processes = 10)
-  cat(paste0("Done with ", gene_sets[i], "\n"))
+  cat(paste0("Done with ", subdirs[i], "\n"))
 }
-names(pathfindR_outputs_HMBA48h_vs_Control48h) = gene_sets
+names(pathfindR_outputs_HMBA48h_vs_Control48h) = subdirs
 
 # Perform hierarchical clustering on the results (average distance metric)
-# Not run for GO-BP and Reactome because the algorithm time complexity is O(n^3)
+# Bear in mind the algorithm time complexity is O(n^3)
 
-cluster_names = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG", "Reactome")
+cluster_names = subdirs
 RNGversion("4.2.2")
 set.seed(123)
 clustered_results_HMBA48h_vs_Control48h = list()
@@ -735,11 +846,13 @@ for (i in 1:length(cluster_names)){
 }
 names(clustered_results_HMBA48h_vs_Control48h) = cluster_names
 
-# BioCarta : The maximum average silhouette width was 0.17 for k = 60
-# GO-BP    : The maximum average silhouette width was 0.1 for k = 350
-# GO-CC    : The maximum average silhouette width was 0.12 for k = 150 
-# GO-MF    : The maximum average silhouette width was 0.11 for k = 150
-# KEGG     : The maximum average silhouette width was 0.12 for k = 80
+# MSigDB Reactome     : The maximum average silhouette width was 0.35 for k = 100
+# MSigDB WikiPathways : The maximum average silhouette width was 0.12 for k = 90
+# MSigDB GO-BP        : The maximum average silhouette width was 0.12 for k = 150 
+# MSigDB GO-CC        : The maximum average silhouette width was 0.11 for k = 150
+# MSigDB GO-MF        : The maximum average silhouette width was 0.12 for k = 80
+# MSigDB BioCarta     : The maximum average silhouette width was 0.4 for k = 550
+# KEGG                : The maximum average silhouette width was 0.4 for k = 550
 
 # Wrapping the text of terms with too many characters in their description
 wrapped_pathfindR_outputs_HMBA48h_vs_Control48h = pathfindR_outputs_HMBA48h_vs_Control48h
@@ -797,46 +910,25 @@ for (i in 1:length(pathfindR_outputs_HMBA48h_vs_Control48h)){
 }
 
 names(enrichment_dotplots_HMBA48h_vs_Control48h) = names(pathfindR_outputs_HMBA48h_vs_Control48h)
-names(cluster_enrichment_dotplots_HMBA48h_vs_Control48h) = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG",
-                                                             "Reactome")
+names(cluster_enrichment_dotplots_HMBA48h_vs_Control48h) = names(pathfindR_outputs_HMBA48h_vs_Control48h)
 
 # Write out results in a comprehensive .xlsx file
 wb = createWorkbook()
-addWorksheet(wb, "BioCarta")
-writeData(wb, "BioCarta", clustered_results_HMBA48h_vs_Control48h[["BioCarta"]])
-addWorksheet(wb, "GO-BP")
-writeData(wb, "GO-BP", clustered_results_HMBA48h_vs_Control48h[["GO-BP"]])
-addWorksheet(wb, "GO-CC")
-writeData(wb, "GO-CC", clustered_results_HMBA48h_vs_Control48h[["GO-CC"]])
-addWorksheet(wb, "GO-MF")
-writeData(wb, "GO-MF", clustered_results_HMBA48h_vs_Control48h[["GO-MF"]])
-addWorksheet(wb, "KEGG")
-writeData(wb, "KEGG", clustered_results_HMBA48h_vs_Control48h[["KEGG"]])
-addWorksheet(wb, "Reactome")
-writeData(wb, "Reactome", clustered_results_HMBA48h_vs_Control48h[["Reactome"]])
+for(i in 1:length(subdirs)) {
+  addWorksheet(wb, subdirs[i])
+  writeData(wb, subdirs[i], clustered_results_HMBA48h_vs_Control48h[[i]])
+}
 saveWorkbook(wb, file = "Pathways/HMBA48h_vs_Control48h/pathfindR/Comprehensive_pathfindR_output.xlsx",
              overwrite = TRUE); rm(wb)
 
-# Representative terms output file (BioCarta, GO-CC, GO-MF & KEGG)
+# Representative terms
 wb2 = createWorkbook()
-addWorksheet(wb2, "BioCarta - rep")
-writeData(wb2, "BioCarta - rep", clustered_results_HMBA48h_vs_Control48h[["BioCarta"]][clustered_results_HMBA48h_vs_Control48h[["BioCarta"]]$Status
-                                                                                       == "Representative", ])
-addWorksheet(wb2, "GOBP - rep")
-writeData(wb2, "GOBP - rep", clustered_results_HMBA48h_vs_Control48h[["GO-BP"]][clustered_results_HMBA48h_vs_Control48h[["GO-BP"]]$Status
-                                                                                == "Representative", ])
-addWorksheet(wb2, "GOCC - rep")
-writeData(wb2, "GOCC - rep", clustered_results_HMBA48h_vs_Control48h[["GO-CC"]][clustered_results_HMBA48h_vs_Control48h[["GO-CC"]]$Status
-                                                                                == "Representative", ])
-addWorksheet(wb2, "GOMF - rep")
-writeData(wb2, "GOMF - rep", clustered_results_HMBA48h_vs_Control48h[["GO-MF"]][clustered_results_HMBA48h_vs_Control48h[["GO-MF"]]$Status
-                                                                                == "Representative", ])
-addWorksheet(wb2, "KEGG - rep")
-writeData(wb2, "KEGG - rep", clustered_results_HMBA48h_vs_Control48h[["KEGG"]][clustered_results_HMBA48h_vs_Control48h[["KEGG"]]$Status
-                                                                               == "Representative", ])
-addWorksheet(wb2, "Reactome - rep")
-writeData(wb2, "Reactome - rep", clustered_results_HMBA48h_vs_Control48h[["Reactome"]][clustered_results_HMBA48h_vs_Control48h[["Reactome"]]$Status
-                                                                                       == "Representative", ])
+for(i in 1:length(subdirs)) {
+  addWorksheet(wb2, paste0(wb2_names[i], " - rep"))
+  writeData(wb2, paste0(wb2_names[i], " - rep"), 
+            clustered_results_HMBA48h_vs_Control48h[[i]][clustered_results_HMBA48h_vs_Control48h[[i]]$Status
+                                                      == "Representative", ])
+}
 saveWorkbook(wb2, file = "Pathways/HMBA48h_vs_Control48h/pathfindR/Representative_terms.xlsx",
              overwrite = TRUE); rm(wb2)
 
@@ -921,28 +1013,30 @@ pathf_input_HMBA48h_vs_HMBA24h = ashr_dgea$HMBA48h_vs_HMBA24h %>%
   na.omit()
 
 # Preparing a pathfindR loop for enrichment analysis
-dirs_HMBA48h_vs_HMBA24h = paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", gene_sets)
+dirs_HMBA48h_vs_HMBA24h = paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", subdirs)
 pathfindR_outputs_HMBA48h_vs_HMBA24h = list()
 
 RNGversion("4.2.2")
 set.seed(123)
 for (i in 1:length(dirs_HMBA48h_vs_HMBA24h)){
-  pathfindR_outputs_HMBA48h_vs_HMBA24h[[i]] = run_pathfindR(pathf_input_HMBA48h_vs_HMBA24h, gene_sets = gene_sets[i],
-                                                            p_val_threshold = 0.05, 
+  pathfindR_outputs_HMBA48h_vs_HMBA24h[[i]] = run_pathfindR(pathf_input_HMBA48h_vs_HMBA24h, gene_sets = "Custom",
+                                                            p_val_threshold = 0.05, convert2alias = FALSE,
+                                                            custom_genes = genes_of_gene_sets[[i]],
+                                                            custom_descriptions = descriptions_of_gene_sets[[i]],
                                                             output_dir = dirs_HMBA48h_vs_HMBA24h[i], min_gset_size = 10,
                                                             max_gset_size = 300, adj_method = 'fdr',
                                                             enrichment_threshold = 0.05,
-                                                            pin_name_path = 'Biogrid', search_method = 'GR',
+                                                            pin_name_path = path2SIF, search_method = 'GR',
                                                             grMaxDepth = 1, grSearchDepth = 1,
                                                             iterations = 10, n_processes = 10)
-  cat(paste0("Done with ", gene_sets[i], "\n"))
+  cat(paste0("Done with ", subdirs[i], "\n"))
 }
-names(pathfindR_outputs_HMBA48h_vs_HMBA24h) = gene_sets
+names(pathfindR_outputs_HMBA48h_vs_HMBA24h) = subdirs
 
 # Perform hierarchical clustering on the results (average distance metric)
-# Not run for GO-BP and Reactome because the algorithm time complexity is O(n^3)
+# Bear in mind the algorithm time complexity is O(n^3)
 
-cluster_names = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG", "Reactome")
+cluster_names = subdirs
 RNGversion("4.2.2")
 set.seed(123)
 clustered_results_HMBA48h_vs_HMBA24h = list()
@@ -952,11 +1046,13 @@ for (i in 1:length(cluster_names)){
 }
 names(clustered_results_HMBA48h_vs_HMBA24h) = cluster_names
 
-# BioCarta : The maximum average silhouette width was 0.17 for k = 60
-# GO-BP    : The maximum average silhouette width was 0.1 for k = 350
-# GO-CC    : The maximum average silhouette width was 0.12 for k = 150 
-# GO-MF    : The maximum average silhouette width was 0.11 for k = 150
-# KEGG     : The maximum average silhouette width was 0.12 for k = 80
+# MSigDB Reactome     : The maximum average silhouette width was 0.35 for k = 100
+# MSigDB WikiPathways : The maximum average silhouette width was 0.12 for k = 90
+# MSigDB GO-BP        : The maximum average silhouette width was 0.12 for k = 150 
+# MSigDB GO-CC        : The maximum average silhouette width was 0.11 for k = 150
+# MSigDB GO-MF        : The maximum average silhouette width was 0.12 for k = 80
+# MSigDB BioCarta     : The maximum average silhouette width was 0.4 for k = 550
+# KEGG                : The maximum average silhouette width was 0.4 for k = 550
 
 # Wrapping the text of terms with too many characters in their description
 wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h = pathfindR_outputs_HMBA48h_vs_HMBA24h
@@ -1014,46 +1110,25 @@ for (i in 1:length(pathfindR_outputs_HMBA48h_vs_HMBA24h)){
 }
 
 names(enrichment_dotplots_HMBA48h_vs_HMBA24h) = names(pathfindR_outputs_HMBA48h_vs_HMBA24h)
-names(cluster_enrichment_dotplots_HMBA48h_vs_HMBA24h) = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG",
-                                                          "Reactome")
+names(cluster_enrichment_dotplots_HMBA48h_vs_HMBA24h) = names(pathfindR_outputs_HMBA48h_vs_HMBA24h)
 
 # Write out results in a comprehensive .xlsx file
 wb = createWorkbook()
-addWorksheet(wb, "BioCarta")
-writeData(wb, "BioCarta", clustered_results_HMBA48h_vs_HMBA24h[["BioCarta"]])
-addWorksheet(wb, "GO-BP")
-writeData(wb, "GO-BP", clustered_results_HMBA48h_vs_HMBA24h[["GO-BP"]])
-addWorksheet(wb, "GO-CC")
-writeData(wb, "GO-CC", clustered_results_HMBA48h_vs_HMBA24h[["GO-CC"]])
-addWorksheet(wb, "GO-MF")
-writeData(wb, "GO-MF", clustered_results_HMBA48h_vs_HMBA24h[["GO-MF"]])
-addWorksheet(wb, "KEGG")
-writeData(wb, "KEGG", clustered_results_HMBA48h_vs_HMBA24h[["KEGG"]])
-addWorksheet(wb, "Reactome")
-writeData(wb, "Reactome", clustered_results_HMBA48h_vs_HMBA24h[["Reactome"]])
+for(i in 1:length(subdirs)) {
+  addWorksheet(wb, subdirs[i])
+  writeData(wb, subdirs[i], clustered_results_HMBA48h_vs_HMBA24h[[i]])
+}
 saveWorkbook(wb, file = "Pathways/HMBA48h_vs_HMBA24h/pathfindR/Comprehensive_pathfindR_output.xlsx",
              overwrite = TRUE); rm(wb)
 
-# Representative terms output file (BioCarta, GO-CC, GO-MF & KEGG)
+# Representative terms
 wb2 = createWorkbook()
-addWorksheet(wb2, "BioCarta - rep")
-writeData(wb2, "BioCarta - rep", clustered_results_HMBA48h_vs_HMBA24h[["BioCarta"]][clustered_results_HMBA48h_vs_HMBA24h[["BioCarta"]]$Status
-                                                                                    == "Representative", ])
-addWorksheet(wb2, "GOBP - rep")
-writeData(wb2, "GOBP - rep", clustered_results_HMBA48h_vs_HMBA24h[["GO-BP"]][clustered_results_HMBA48h_vs_HMBA24h[["GO-BP"]]$Status
-                                                                             == "Representative", ])
-addWorksheet(wb2, "GOCC - rep")
-writeData(wb2, "GOCC - rep", clustered_results_HMBA48h_vs_HMBA24h[["GO-CC"]][clustered_results_HMBA48h_vs_HMBA24h[["GO-CC"]]$Status
-                                                                             == "Representative", ])
-addWorksheet(wb2, "GOMF - rep")
-writeData(wb2, "GOMF - rep", clustered_results_HMBA48h_vs_HMBA24h[["GO-MF"]][clustered_results_HMBA48h_vs_HMBA24h[["GO-MF"]]$Status
-                                                                             == "Representative", ])
-addWorksheet(wb2, "KEGG - rep")
-writeData(wb2, "KEGG - rep", clustered_results_HMBA48h_vs_HMBA24h[["KEGG"]][clustered_results_HMBA48h_vs_HMBA24h[["KEGG"]]$Status
-                                                                            == "Representative", ])
-addWorksheet(wb2, "Reactome - rep")
-writeData(wb2, "Reactome - rep", clustered_results_HMBA48h_vs_HMBA24h[["Reactome"]][clustered_results_HMBA48h_vs_HMBA24h[["Reactome"]]$Status
-                                                                                    == "Representative", ])
+for(i in 1:length(subdirs)) {
+  addWorksheet(wb2, paste0(wb2_names[i], " - rep"))
+  writeData(wb2, paste0(wb2_names[i], " - rep"), 
+            clustered_results_HMBA48h_vs_HMBA24h[[i]][clustered_results_HMBA48h_vs_HMBA24h[[i]]$Status
+                                                      == "Representative", ])
+}
 saveWorkbook(wb2, file = "Pathways/HMBA48h_vs_HMBA24h/pathfindR/Representative_terms.xlsx",
              overwrite = TRUE); rm(wb2)
 
@@ -1138,28 +1213,30 @@ pathf_input_HMBA72h_vs_Control48h = ashr_dgea$HMBA72h_vs_Control48h %>%
   na.omit()
 
 # Preparing a pathfindR loop for enrichment analysis
-dirs_HMBA72h_vs_Control48h = paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", gene_sets)
+dirs_HMBA72h_vs_Control48h = paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", subdirs)
 pathfindR_outputs_HMBA72h_vs_Control48h = list()
 
 RNGversion("4.2.2")
 set.seed(123)
 for (i in 1:length(dirs_HMBA72h_vs_Control48h)){
-  pathfindR_outputs_HMBA72h_vs_Control48h[[i]] = run_pathfindR(pathf_input_HMBA72h_vs_Control48h, gene_sets = gene_sets[i],
-                                                               p_val_threshold = 0.05, 
+  pathfindR_outputs_HMBA72h_vs_Control48h[[i]] = run_pathfindR(pathf_input_HMBA72h_vs_Control48h, gene_sets = "Custom",
+                                                               p_val_threshold = 0.05, convert2alias = FALSE,
+                                                               custom_genes = genes_of_gene_sets[[i]],
+                                                               custom_descriptions = descriptions_of_gene_sets[[i]],
                                                                output_dir = dirs_HMBA72h_vs_Control48h[i], min_gset_size = 10,
                                                                max_gset_size = 300, adj_method = 'fdr',
                                                                enrichment_threshold = 0.05,
-                                                               pin_name_path = 'Biogrid', search_method = 'GR',
+                                                               pin_name_path = path2SIF, search_method = 'GR',
                                                                grMaxDepth = 1, grSearchDepth = 1,
                                                                iterations = 10, n_processes = 10)
-  cat(paste0("Done with ", gene_sets[i], "\n"))
+  cat(paste0("Done with ", subdirs[i], "\n"))
 }
-names(pathfindR_outputs_HMBA72h_vs_Control48h) = gene_sets
+names(pathfindR_outputs_HMBA72h_vs_Control48h) = subdirs
 
 # Perform hierarchical clustering on the results (average distance metric)
-# Not run for GO-BP and Reactome because the algorithm time complexity is O(n^3)
+# Bear in mind the algorithm time complexity is O(n^3)
 
-cluster_names = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG", "Reactome")
+cluster_names = subdirs
 RNGversion("4.2.2")
 set.seed(123)
 clustered_results_HMBA72h_vs_Control48h = list()
@@ -1169,11 +1246,13 @@ for (i in 1:length(cluster_names)){
 }
 names(clustered_results_HMBA72h_vs_Control48h) = cluster_names
 
-# BioCarta : The maximum average silhouette width was 0.17 for k = 60
-# GO-BP    : The maximum average silhouette width was 0.1 for k = 350
-# GO-CC    : The maximum average silhouette width was 0.12 for k = 150 
-# GO-MF    : The maximum average silhouette width was 0.11 for k = 150
-# KEGG     : The maximum average silhouette width was 0.12 for k = 80
+# MSigDB Reactome     : The maximum average silhouette width was 0.35 for k = 100
+# MSigDB WikiPathways : The maximum average silhouette width was 0.12 for k = 90
+# MSigDB GO-BP        : The maximum average silhouette width was 0.12 for k = 150 
+# MSigDB GO-CC        : The maximum average silhouette width was 0.11 for k = 150
+# MSigDB GO-MF        : The maximum average silhouette width was 0.12 for k = 80
+# MSigDB BioCarta     : The maximum average silhouette width was 0.4 for k = 550
+# KEGG                : The maximum average silhouette width was 0.4 for k = 550
 
 # Wrapping the text of terms with too many characters in their description
 wrapped_pathfindR_outputs_HMBA72h_vs_Control48h = pathfindR_outputs_HMBA72h_vs_Control48h
@@ -1231,46 +1310,25 @@ for (i in 1:length(pathfindR_outputs_HMBA72h_vs_Control48h)){
 }
 
 names(enrichment_dotplots_HMBA72h_vs_Control48h) = names(pathfindR_outputs_HMBA72h_vs_Control48h)
-names(cluster_enrichment_dotplots_HMBA72h_vs_Control48h) = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG",
-                                                             "Reactome")
+names(cluster_enrichment_dotplots_HMBA72h_vs_Control48h) = names(pathfindR_outputs_HMBA72h_vs_Control48h)
 
 # Write out results in a comprehensive .xlsx file
 wb = createWorkbook()
-addWorksheet(wb, "BioCarta")
-writeData(wb, "BioCarta", clustered_results_HMBA72h_vs_Control48h[["BioCarta"]])
-addWorksheet(wb, "GO-BP")
-writeData(wb, "GO-BP", clustered_results_HMBA72h_vs_Control48h[["GO-BP"]])
-addWorksheet(wb, "GO-CC")
-writeData(wb, "GO-CC", clustered_results_HMBA72h_vs_Control48h[["GO-CC"]])
-addWorksheet(wb, "GO-MF")
-writeData(wb, "GO-MF", clustered_results_HMBA72h_vs_Control48h[["GO-MF"]])
-addWorksheet(wb, "KEGG")
-writeData(wb, "KEGG", clustered_results_HMBA72h_vs_Control48h[["KEGG"]])
-addWorksheet(wb, "Reactome")
-writeData(wb, "Reactome", clustered_results_HMBA72h_vs_Control48h[["Reactome"]])
+for(i in 1:length(subdirs)) {
+  addWorksheet(wb, subdirs[i])
+  writeData(wb, subdirs[i], clustered_results_HMBA72h_vs_Control48h[[i]])
+}
 saveWorkbook(wb, file = "Pathways/HMBA72h_vs_Control48h/pathfindR/Comprehensive_pathfindR_output.xlsx",
              overwrite = TRUE); rm(wb)
 
-# Representative terms output file (BioCarta, GO-CC, GO-MF & KEGG)
+# Representative terms
 wb2 = createWorkbook()
-addWorksheet(wb2, "BioCarta - rep")
-writeData(wb2, "BioCarta - rep", clustered_results_HMBA72h_vs_Control48h[["BioCarta"]][clustered_results_HMBA72h_vs_Control48h[["BioCarta"]]$Status
-                                                                                       == "Representative", ])
-addWorksheet(wb2, "GOBP - rep")
-writeData(wb2, "GOBP - rep", clustered_results_HMBA72h_vs_Control48h[["GO-BP"]][clustered_results_HMBA72h_vs_Control48h[["GO-BP"]]$Status
-                                                                                == "Representative", ])
-addWorksheet(wb2, "GOCC - rep")
-writeData(wb2, "GOCC - rep", clustered_results_HMBA72h_vs_Control48h[["GO-CC"]][clustered_results_HMBA72h_vs_Control48h[["GO-CC"]]$Status
-                                                                                == "Representative", ])
-addWorksheet(wb2, "GOMF - rep")
-writeData(wb2, "GOMF - rep", clustered_results_HMBA72h_vs_Control48h[["GO-MF"]][clustered_results_HMBA72h_vs_Control48h[["GO-MF"]]$Status
-                                                                                == "Representative", ])
-addWorksheet(wb2, "KEGG - rep")
-writeData(wb2, "KEGG - rep", clustered_results_HMBA72h_vs_Control48h[["KEGG"]][clustered_results_HMBA72h_vs_Control48h[["KEGG"]]$Status
-                                                                               == "Representative", ])
-addWorksheet(wb2, "Reactome - rep")
-writeData(wb2, "Reactome - rep", clustered_results_HMBA72h_vs_Control48h[["Reactome"]][clustered_results_HMBA72h_vs_Control48h[["Reactome"]]$Status
-                                                                                       == "Representative", ])
+for(i in 1:length(subdirs)) {
+  addWorksheet(wb2, paste0(wb2_names[i], " - rep"))
+  writeData(wb2, paste0(wb2_names[i], " - rep"), 
+            clustered_results_HMBA72h_vs_Control48h[[i]][clustered_results_HMBA72h_vs_Control48h[[i]]$Status
+                                                      == "Representative", ])
+}
 saveWorkbook(wb2, file = "Pathways/HMBA72h_vs_Control48h/pathfindR/Representative_terms.xlsx",
              overwrite = TRUE); rm(wb2)
 
@@ -1355,28 +1413,30 @@ pathf_input_HMBA72h_vs_HMBA24h = ashr_dgea$HMBA72h_vs_HMBA24h %>%
   na.omit()
 
 # Preparing a pathfindR loop for enrichment analysis
-dirs_HMBA72h_vs_HMBA24h = paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", gene_sets)
+dirs_HMBA72h_vs_HMBA24h = paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", subdirs)
 pathfindR_outputs_HMBA72h_vs_HMBA24h = list()
 
 RNGversion("4.2.2")
 set.seed(123)
 for (i in 1:length(dirs_HMBA72h_vs_HMBA24h)){
-  pathfindR_outputs_HMBA72h_vs_HMBA24h[[i]] = run_pathfindR(pathf_input_HMBA72h_vs_HMBA24h, gene_sets = gene_sets[i],
-                                                            p_val_threshold = 0.05, 
+  pathfindR_outputs_HMBA72h_vs_HMBA24h[[i]] = run_pathfindR(pathf_input_HMBA72h_vs_HMBA24h, gene_sets = "Custom",
+                                                            p_val_threshold = 0.05, convert2alias = FALSE,
+                                                            custom_genes = genes_of_gene_sets[[i]],
+                                                            custom_descriptions = descriptions_of_gene_sets[[i]],
                                                             output_dir = dirs_HMBA72h_vs_HMBA24h[i], min_gset_size = 10,
                                                             max_gset_size = 300, adj_method = 'fdr',
                                                             enrichment_threshold = 0.05,
-                                                            pin_name_path = 'Biogrid', search_method = 'GR',
+                                                            pin_name_path = path2SIF, search_method = 'GR',
                                                             grMaxDepth = 1, grSearchDepth = 1,
                                                             iterations = 10, n_processes = 10)
-  cat(paste0("Done with ", gene_sets[i], "\n"))
+  cat(paste0("Done with ", subdirs[i], "\n"))
 }
-names(pathfindR_outputs_HMBA72h_vs_HMBA24h) = gene_sets
+names(pathfindR_outputs_HMBA72h_vs_HMBA24h) = subdirs
 
 # Perform hierarchical clustering on the results (average distance metric)
-# Not run for GO-BP and Reactome because the algorithm time complexity is O(n^3)
+# Bear in mind the algorithm time complexity is O(n^3)
 
-cluster_names = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG", "Reactome")
+cluster_names = subdirs
 RNGversion("4.2.2")
 set.seed(123)
 clustered_results_HMBA72h_vs_HMBA24h = list()
@@ -1386,11 +1446,13 @@ for (i in 1:length(cluster_names)){
 }
 names(clustered_results_HMBA72h_vs_HMBA24h) = cluster_names
 
-# BioCarta : The maximum average silhouette width was 0.17 for k = 60
-# GO-BP    : The maximum average silhouette width was 0.1 for k = 350
-# GO-CC    : The maximum average silhouette width was 0.12 for k = 150 
-# GO-MF    : The maximum average silhouette width was 0.11 for k = 150
-# KEGG     : The maximum average silhouette width was 0.12 for k = 80
+# MSigDB Reactome     : The maximum average silhouette width was 0.35 for k = 100
+# MSigDB WikiPathways : The maximum average silhouette width was 0.12 for k = 90
+# MSigDB GO-BP        : The maximum average silhouette width was 0.12 for k = 150 
+# MSigDB GO-CC        : The maximum average silhouette width was 0.11 for k = 150
+# MSigDB GO-MF        : The maximum average silhouette width was 0.12 for k = 80
+# MSigDB BioCarta     : The maximum average silhouette width was 0.4 for k = 550
+# KEGG                : The maximum average silhouette width was 0.4 for k = 550
 
 # Wrapping the text of terms with too many characters in their description
 wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h = pathfindR_outputs_HMBA72h_vs_HMBA24h
@@ -1448,46 +1510,25 @@ for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA24h)){
 }
 
 names(enrichment_dotplots_HMBA72h_vs_HMBA24h) = names(pathfindR_outputs_HMBA72h_vs_HMBA24h)
-names(cluster_enrichment_dotplots_HMBA72h_vs_HMBA24h) = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG",
-                                                          "Reactome")
+names(cluster_enrichment_dotplots_HMBA72h_vs_HMBA24h) = names(pathfindR_outputs_HMBA72h_vs_HMBA24h)
 
 # Write out results in a comprehensive .xlsx file
 wb = createWorkbook()
-addWorksheet(wb, "BioCarta")
-writeData(wb, "BioCarta", clustered_results_HMBA72h_vs_HMBA24h[["BioCarta"]])
-addWorksheet(wb, "GO-BP")
-writeData(wb, "GO-BP", clustered_results_HMBA72h_vs_HMBA24h[["GO-BP"]])
-addWorksheet(wb, "GO-CC")
-writeData(wb, "GO-CC", clustered_results_HMBA72h_vs_HMBA24h[["GO-CC"]])
-addWorksheet(wb, "GO-MF")
-writeData(wb, "GO-MF", clustered_results_HMBA72h_vs_HMBA24h[["GO-MF"]])
-addWorksheet(wb, "KEGG")
-writeData(wb, "KEGG", clustered_results_HMBA72h_vs_HMBA24h[["KEGG"]])
-addWorksheet(wb, "Reactome")
-writeData(wb, "Reactome", clustered_results_HMBA72h_vs_HMBA24h[["Reactome"]])
+for(i in 1:length(subdirs)) {
+  addWorksheet(wb, subdirs[i])
+  writeData(wb, subdirs[i], clustered_results_HMBA72h_vs_HMBA24h[[i]])
+}
 saveWorkbook(wb, file = "Pathways/HMBA72h_vs_HMBA24h/pathfindR/Comprehensive_pathfindR_output.xlsx",
              overwrite = TRUE); rm(wb)
 
-# Representative terms output file (BioCarta, GO-CC, GO-MF & KEGG)
+# Representative terms
 wb2 = createWorkbook()
-addWorksheet(wb2, "BioCarta - rep")
-writeData(wb2, "BioCarta - rep", clustered_results_HMBA72h_vs_HMBA24h[["BioCarta"]][clustered_results_HMBA72h_vs_HMBA24h[["BioCarta"]]$Status
-                                                                                    == "Representative", ])
-addWorksheet(wb2, "GOBP - rep")
-writeData(wb2, "GOBP - rep", clustered_results_HMBA72h_vs_HMBA24h[["GO-BP"]][clustered_results_HMBA72h_vs_HMBA24h[["GO-BP"]]$Status
-                                                                             == "Representative", ])
-addWorksheet(wb2, "GOCC - rep")
-writeData(wb2, "GOCC - rep", clustered_results_HMBA72h_vs_HMBA24h[["GO-CC"]][clustered_results_HMBA72h_vs_HMBA24h[["GO-CC"]]$Status
-                                                                             == "Representative", ])
-addWorksheet(wb2, "GOMF - rep")
-writeData(wb2, "GOMF - rep", clustered_results_HMBA72h_vs_HMBA24h[["GO-MF"]][clustered_results_HMBA72h_vs_HMBA24h[["GO-MF"]]$Status
-                                                                             == "Representative", ])
-addWorksheet(wb2, "KEGG - rep")
-writeData(wb2, "KEGG - rep", clustered_results_HMBA72h_vs_HMBA24h[["KEGG"]][clustered_results_HMBA72h_vs_HMBA24h[["KEGG"]]$Status
-                                                                            == "Representative", ])
-addWorksheet(wb2, "Reactome - rep")
-writeData(wb2, "Reactome - rep", clustered_results_HMBA72h_vs_HMBA24h[["Reactome"]][clustered_results_HMBA72h_vs_HMBA24h[["Reactome"]]$Status
-                                                                                    == "Representative", ])
+for(i in 1:length(subdirs)) {
+  addWorksheet(wb2, paste0(wb2_names[i], " - rep"))
+  writeData(wb2, paste0(wb2_names[i], " - rep"), 
+            clustered_results_HMBA72h_vs_HMBA24h[[i]][clustered_results_HMBA72h_vs_HMBA24h[[i]]$Status
+                                                      == "Representative", ])
+}
 saveWorkbook(wb2, file = "Pathways/HMBA72h_vs_HMBA24h/pathfindR/Representative_terms.xlsx",
              overwrite = TRUE); rm(wb2)
 
@@ -1572,28 +1613,30 @@ pathf_input_HMBA72h_vs_HMBA48h = ashr_dgea$HMBA72h_vs_HMBA48h %>%
   na.omit()
 
 # Preparing a pathfindR loop for enrichment analysis
-dirs_HMBA72h_vs_HMBA48h = paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", gene_sets)
+dirs_HMBA72h_vs_HMBA48h = paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", subdirs)
 pathfindR_outputs_HMBA72h_vs_HMBA48h = list()
 
 RNGversion("4.2.2")
 set.seed(123)
 for (i in 1:length(dirs_HMBA72h_vs_HMBA48h)){
-  pathfindR_outputs_HMBA72h_vs_HMBA48h[[i]] = run_pathfindR(pathf_input_HMBA72h_vs_HMBA48h, gene_sets = gene_sets[i],
-                                                            p_val_threshold = 0.05, 
+  pathfindR_outputs_HMBA72h_vs_HMBA48h[[i]] = run_pathfindR(pathf_input_HMBA72h_vs_HMBA48h, ggene_sets = "Custom",
+                                                            p_val_threshold = 0.05, convert2alias = FALSE,
+                                                            custom_genes = genes_of_gene_sets[[i]],
+                                                            custom_descriptions = descriptions_of_gene_sets[[i]],
                                                             output_dir = dirs_HMBA72h_vs_HMBA48h[i], min_gset_size = 10,
                                                             max_gset_size = 300, adj_method = 'fdr',
                                                             enrichment_threshold = 0.05,
-                                                            pin_name_path = 'Biogrid', search_method = 'GR',
+                                                            pin_name_path = path2SIF, search_method = 'GR',
                                                             grMaxDepth = 1, grSearchDepth = 1,
                                                             iterations = 10, n_processes = 10)
-  cat(paste0("Done with ", gene_sets[i], "\n"))
+  cat(paste0("Done with ", subdirs[i], "\n"))
 }
-names(pathfindR_outputs_HMBA72h_vs_HMBA48h) = gene_sets
+names(pathfindR_outputs_HMBA72h_vs_HMBA48h) = subdirs
 
 # Perform hierarchical clustering on the results (average distance metric)
-# Not run for GO-BP and Reactome because the algorithm time complexity is O(n^3)
+# Bear in mind the algorithm time complexity is O(n^3)
 
-cluster_names = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG", "Reactome")
+cluster_names = subdirs
 RNGversion("4.2.2")
 set.seed(123)
 clustered_results_HMBA72h_vs_HMBA48h = list()
@@ -1603,11 +1646,13 @@ for (i in 1:length(cluster_names)){
 }
 names(clustered_results_HMBA72h_vs_HMBA48h) = cluster_names
 
-# BioCarta : The maximum average silhouette width was 0.17 for k = 60
-# GO-BP    : The maximum average silhouette width was 0.1 for k = 350
-# GO-CC    : The maximum average silhouette width was 0.12 for k = 150 
-# GO-MF    : The maximum average silhouette width was 0.11 for k = 150
-# KEGG     : The maximum average silhouette width was 0.12 for k = 80
+# MSigDB Reactome     : The maximum average silhouette width was 0.35 for k = 100
+# MSigDB WikiPathways : The maximum average silhouette width was 0.12 for k = 90
+# MSigDB GO-BP        : The maximum average silhouette width was 0.12 for k = 150 
+# MSigDB GO-CC        : The maximum average silhouette width was 0.11 for k = 150
+# MSigDB GO-MF        : The maximum average silhouette width was 0.12 for k = 80
+# MSigDB BioCarta     : The maximum average silhouette width was 0.4 for k = 550
+# KEGG                : The maximum average silhouette width was 0.4 for k = 550
 
 # Wrapping the text of terms with too many characters in their description
 wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h = pathfindR_outputs_HMBA72h_vs_HMBA48h
@@ -1665,46 +1710,25 @@ for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA48h)){
 }
 
 names(enrichment_dotplots_HMBA72h_vs_HMBA48h) = names(pathfindR_outputs_HMBA72h_vs_HMBA48h)
-names(cluster_enrichment_dotplots_HMBA72h_vs_HMBA48h) = c("BioCarta", "GO-BP", "GO-CC", "GO-MF", "KEGG",
-                                                          "Reactome")
+names(cluster_enrichment_dotplots_HMBA72h_vs_HMBA48h) = names(pathfindR_outputs_HMBA72h_vs_HMBA48h)
 
 # Write out results in a comprehensive .xlsx file
 wb = createWorkbook()
-addWorksheet(wb, "BioCarta")
-writeData(wb, "BioCarta", clustered_results_HMBA72h_vs_HMBA48h[["BioCarta"]])
-addWorksheet(wb, "GO-BP")
-writeData(wb, "GO-BP", clustered_results_HMBA72h_vs_HMBA48h[["GO-BP"]])
-addWorksheet(wb, "GO-CC")
-writeData(wb, "GO-CC", clustered_results_HMBA72h_vs_HMBA48h[["GO-CC"]])
-addWorksheet(wb, "GO-MF")
-writeData(wb, "GO-MF", clustered_results_HMBA72h_vs_HMBA48h[["GO-MF"]])
-addWorksheet(wb, "KEGG")
-writeData(wb, "KEGG", clustered_results_HMBA72h_vs_HMBA48h[["KEGG"]])
-addWorksheet(wb, "Reactome")
-writeData(wb, "Reactome", clustered_results_HMBA72h_vs_HMBA48h[["Reactome"]])
+for(i in 1:length(subdirs)) {
+  addWorksheet(wb, subdirs[i])
+  writeData(wb, subdirs[i], clustered_results_HMBA72h_vs_HMBA48h[[i]])
+}
 saveWorkbook(wb, file = "Pathways/HMBA72h_vs_HMBA48h/pathfindR/Comprehensive_pathfindR_output.xlsx",
              overwrite = TRUE); rm(wb)
 
-# Representative terms output file (BioCarta, GO-CC, GO-MF & KEGG)
+# Representative terms
 wb2 = createWorkbook()
-addWorksheet(wb2, "BioCarta - rep")
-writeData(wb2, "BioCarta - rep", clustered_results_HMBA72h_vs_HMBA48h[["BioCarta"]][clustered_results_HMBA72h_vs_HMBA48h[["BioCarta"]]$Status
-                                                                                    == "Representative", ])
-addWorksheet(wb2, "GOBP - rep")
-writeData(wb2, "GOBP - rep", clustered_results_HMBA72h_vs_HMBA48h[["GO-BP"]][clustered_results_HMBA72h_vs_HMBA48h[["GO-BP"]]$Status
-                                                                             == "Representative", ])
-addWorksheet(wb2, "GOCC - rep")
-writeData(wb2, "GOCC - rep", clustered_results_HMBA72h_vs_HMBA48h[["GO-CC"]][clustered_results_HMBA72h_vs_HMBA48h[["GO-CC"]]$Status
-                                                                             == "Representative", ])
-addWorksheet(wb2, "GOMF - rep")
-writeData(wb2, "GOMF - rep", clustered_results_HMBA72h_vs_HMBA48h[["GO-MF"]][clustered_results_HMBA72h_vs_HMBA48h[["GO-MF"]]$Status
-                                                                             == "Representative", ])
-addWorksheet(wb2, "KEGG - rep")
-writeData(wb2, "KEGG - rep", clustered_results_HMBA72h_vs_HMBA48h[["KEGG"]][clustered_results_HMBA72h_vs_HMBA48h[["KEGG"]]$Status
-                                                                            == "Representative", ])
-addWorksheet(wb2, "Reactome - rep")
-writeData(wb2, "Reactome - rep", clustered_results_HMBA72h_vs_HMBA48h[["Reactome"]][clustered_results_HMBA72h_vs_HMBA48h[["Reactome"]]$Status
-                                                                                    == "Representative", ])
+for(i in 1:length(subdirs)) {
+  addWorksheet(wb2, paste0(wb2_names[i], " - rep"))
+  writeData(wb2, paste0(wb2_names[i], " - rep"), 
+            clustered_results_HMBA72h_vs_HMBA48h[[i]][clustered_results_HMBA72h_vs_HMBA48h[[i]]$Status
+                                                                                      == "Representative", ])
+}
 saveWorkbook(wb2, file = "Pathways/HMBA72h_vs_HMBA48h/pathfindR/Representative_terms.xlsx",
              overwrite = TRUE); rm(wb2)
 
