@@ -628,7 +628,7 @@ names(clustered_results_HMBA24h_vs_Control48h) = cluster_names
 # MSigDB GO-CC        : The maximum average silhouette width was 0.29 for k = 20
 # MSigDB GO-MF        : The maximum average silhouette width was 0.25 for k = 30
 # MSigDB BioCarta     : The maximum average silhouette width was 0.17 for k = 14 
-# KEGG                : The maximum average silhouette width was 0.16 for k = 2
+# KEGG                : The maximum average silhouette width was 0.15 for k = 2
 
 # Wrapping the text of terms with too many characters in their description
 wrapped_pathfindR_outputs_HMBA24h_vs_Control48h = pathfindR_outputs_HMBA24h_vs_Control48h
@@ -662,21 +662,17 @@ for (i in 1:length(pathfindR_outputs_HMBA24h_vs_Control48h)){
                                                                     top_terms = 10)+
     scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
     scale_size(range = c(0.1, 2)) +
-    theme(plot.title = element_text(size = 6, face = "bold", vjust = 2, hjust = 0.5),
-          # plot.title.position = "panel",
-          axis.text.y = element_text(color = "black", size = 4),
-          axis.text.x = element_text(color = "black", size = 4),
-          axis.title.x = element_text(size = 5, face = "bold"),
+    theme(plot.title = element_text(size = 5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 3.5),
+          axis.title.x = element_text(size = 4.5, face = "bold"),
           legend.key.size = unit(1.5, units = "mm"),
           legend.spacing.y = unit(0.5, units = "mm"),
           legend.spacing.x = unit(0.5, units = "mm"),
-          legend.title = element_text(size = 4, face = "bold"),
-          legend.text = element_text(size = 3))+
+          legend.title = element_text(size = 3.5, face = "bold"),
+          legend.text = element_text(size = 2.75))+
     labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i],
                         " terms enrichment dotplot - (", comparisons["HMBA24h_vs_Control48h"], ")"))
-  # tiff(paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/",
-  #            names(pathfindR_outputs_HMBA24h_vs_Control48h)[i], "_top10_dotplot.tiff"), 
-  #     width = 9600, height = 5400, res = 700, compression = "lzw")
   print(enrichment_dotplots_HMBA24h_vs_Control48h[[i]])
   ggsave(filename = paste0(names(pathfindR_outputs_HMBA24h_vs_Control48h)[i], "_top10_dotplot.tiff"),
          path = paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", 
@@ -691,16 +687,24 @@ for (i in 1:length(pathfindR_outputs_HMBA24h_vs_Control48h)){
                                                                             top_terms = NULL,
                                                                             plot_by_cluster = TRUE)+
     scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
-    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
-          axis.text.y = element_text(color = "black", size = 12),
-          axis.text.x = element_text(color = "black", size = 14),
-          axis.title.x = element_text(size = 15, face = "bold"))+
+    scale_size(range = c(0.1, 2)) +
+    theme(plot.title = element_text(size = 5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 3.5),
+          axis.title.x = element_text(size = 4.5, face = "bold"),
+          legend.key.size = unit(1.5, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 3.5, face = "bold"),
+          legend.text = element_text(size = 2.75))+
     labs(title = paste0("Top 10 clustered ", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i],
                         " terms enrichment dotplot - (", comparisons["HMBA24h_vs_Control48h"], ")"))
-  tiff(paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/",
-              names(pathfindR_outputs_HMBA24h_vs_Control48h)[i], "_top10_dotplot_clustered.tiff"), 
-       width = 9600, height = 5400, res = 700, compression = "lzw")
   print(cluster_enrichment_dotplots_HMBA24h_vs_Control48h[[i]])
+  ggsave(filename = paste0(names(pathfindR_outputs_HMBA24h_vs_Control48h)[i], "_top10_dotplot_clustered.tiff"),
+         path = paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
 }
 
@@ -774,46 +778,71 @@ for (i in 1:length(pathfindR_outputs_HMBA24h_vs_Control48h)){
   # term-gene heatmaps
   term_gene_heatmaps_HMBA24h_vs_Control48h[[i]] = term_gene_heatmap(result_df = wrapped_pathfindR_outputs_HMBA24h_vs_Control48h[[i]],
                                                                     genes_df = pathf_input_HMBA24h_vs_Control48h,
-                                                                    num_terms = 5,
+                                                                    num_terms = 10,
                                                                     use_description = TRUE,
-                                                                    low = "darkgreen",
-                                                                    high = "darkred",
-                                                                    mid = "black")+
-    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
-          axis.text.x = element_text(size = axis_text_size[i], vjust = 0.5, color = "black"),
-          axis.text.y = element_text(size = 13),
-          legend.title = element_text(size = 13),
-          legend.title.align = 0.5,
-          legend.direction = "vertical") +
-    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], 
+                                                                    low = "darkblue",
+                                                                    high = "red",
+                                                                    mid = "white",
+                                                                    pin_name_path = path2SIF)+
+  theme(plot.title = element_text(size = 4.5, face = "bold", vjust = 2, hjust = 0.5),
+        axis.text.y = element_text(color = "black", size = 3.5),
+        axis.text.x = element_text(color = "black", size = 2.5,  vjust = 0.5),
+        axis.title.x = element_text(size = 5, face = "bold"),
+        legend.key.size = unit(3, units = "mm"),
+        legend.spacing.y = unit(0.5, units = "mm"),
+        legend.spacing.x = unit(0.5, units = "mm"),
+        legend.title = element_text(size = 4, face = "bold"),
+        legend.text = element_text(size = 4),
+        legend.title.align = 0.5,
+        legend.direction = "vertical") +
+    scale_fill_gradient2(name = "logFC",
+                         low = "darkblue", mid = "white", na.value = "white",
+                         high = "red") +
+    labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], 
                         " terms - differentially expressed genes heatmap (",
                         comparisons["HMBA24h_vs_Control48h"], ")"),
          fill = expression(log[2] ~ "FoldChange"))
-  tiff(paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/",
-              names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "_top5_term_gene_heatmap.tiff"), 
-       width = 17920, height = 3024, res = 700, compression = "lzw")
   print(ggdraw(align_legend(term_gene_heatmaps_HMBA24h_vs_Control48h[[i]], hjust = 0.5)))
+  ggsave(filename = paste0(names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i],
+                           "_top10_term_gene_heatmap.tiff"),
+         path = paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
   
   # term-gene graphs
   term_gene_graphs_HMBA24h_vs_Control48h[[i]] = term_gene_graph(result_df = pathfindR_outputs_HMBA24h_vs_Control48h[[i]],
-                                                                num_terms = 3,
+                                                                num_terms = 5,
                                                                 use_description = TRUE,
                                                                 node_size = "p_val")+
-    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
-          plot.subtitle = element_text(size = 15, face = "bold", hjust = 0.5, vjust = 0.5),
-          legend.title = element_text(size = 15),
+    aes(max.overlaps = 5)+
+    scale_size(range = c(1, 3)) +
+    suppressWarnings(ggraph::geom_node_text(ggplot2::aes_(label = ~name),  nudge_y = .1,
+                                            repel = TRUE, size = 1, max.overlaps = 10, check_overlap = T))+
+    theme(plot.title = element_text(size = 6, face = "bold", hjust = 0.5, vjust = 0.5),
+          plot.background = element_rect(fill = "white"),
+          plot.subtitle = element_text(size = 4.5, face = "italic", hjust = 0.5, vjust = 1.5),
+          legend.key.size = unit(2, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
           legend.title.align = 0.5,
-          legend.direction = "vertical",
-          legend.text = element_text(size = 13))+
-    labs(title = paste0("Top 3 ", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], 
+          legend.direction = "vertical")+
+    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], 
                         " term - gene graph (",
-                        comparisons["HMBA24h_vs_Control48h"], ")"),
-         fill = expression(log[2] ~ "FoldChange"))
-  tiff(paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/",
-              names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "_top3_term_gene_graph.tiff"), 
-       width = 1920*7, height = 1080*7, res = 700, compression ="lzw")
+                        comparisons["HMBA24h_vs_Control48h"], ")"))
+  term_gene_graphs_HMBA24h_vs_Control48h[[i]]$layers = list(term_gene_graphs_HMBA24h_vs_Control48h[[i]]$layers[[1]], 
+                                                            term_gene_graphs_HMBA24h_vs_Control48h[[i]]$layers[[2]], 
+                                                            term_gene_graphs_HMBA24h_vs_Control48h[[i]]$layers[[4]])
   print(term_gene_graphs_HMBA24h_vs_Control48h[[i]])
+  ggsave(filename = paste0(names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i],
+                           "_top5_term_gene_graph.tiff"),
+         path = paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/"),
+         width = 1920*2.5, height = 1080*2.5, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
 }
 
@@ -827,11 +856,26 @@ for (i in 1:length(pathfindR_outputs_HMBA24h_vs_Control48h)){
                                                       use_description = TRUE,
                                                       low = "darkgreen",
                                                       high = "darkred",
-                                                      mid = "black")+
-    theme(axis.text.y = element_text(size = axis_text_size[[i]]))
+                                                      mid = "white")+
+    theme(plot.title = element_text(size = 6, face = "bold", hjust = 0.5, vjust = 0.5),
+          axis.text.y = element_text(size = 3),
+          legend.key.size = unit(2, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
+          legend.title.align = 0.5,
+          legend.direction = "vertical")+
+    ggupset::theme_combmatrix(combmatrix.panel.point.color.fill = "black",
+                              combmatrix.panel.point.size = 0.8,
+                              combmatrix.panel.line.size = 0.5)+
+    labs(fill = "logFC",
+         title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], 
+         " term - UpSet plot (",
+         comparisons["HMBA24h_vs_Control48h"], ")"))
   tiff(paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/",
               names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "_top5_UpSet_plot.tiff"), 
-       width = 6740, height = 17920, res = 700, compression = "lzw")
+       width = 2880, height = 1620*4, res = 700, compression = "lzw")
   print(UpSet_plots_HMBA24h_vs_Control48h[[i]])
   dev.off()
 }
@@ -912,16 +956,24 @@ for (i in 1:length(pathfindR_outputs_HMBA48h_vs_Control48h)){
   enrichment_dotplots_HMBA48h_vs_Control48h[[i]] = enrichment_chart(result_df = wrapped_pathfindR_outputs_HMBA48h_vs_Control48h[[i]],
                                                                     top_terms = 10)+
     scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
-    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
-          axis.text.y = element_text(color = "black", size = 14),
-          axis.text.x = element_text(color = "black", size = 14),
-          axis.title.x = element_text(size = 15, face = "bold"))+
+    scale_size(range = c(0.1, 2)) +
+    theme(plot.title = element_text(size = 5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 3.5),
+          axis.title.x = element_text(size = 4.5, face = "bold"),
+          legend.key.size = unit(1.5, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 3.5, face = "bold"),
+          legend.text = element_text(size = 2.75))+
     labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i],
                         " terms enrichment dotplot - (", comparisons["HMBA48h_vs_Control48h"], ")"))
-  tiff(paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "/",
-              names(pathfindR_outputs_HMBA48h_vs_Control48h)[i], "_top10_dotplot.tiff"), 
-       width = 9600, height = 5400, res = 700, compression = "lzw")
   print(enrichment_dotplots_HMBA48h_vs_Control48h[[i]])
+  ggsave(filename = paste0(names(pathfindR_outputs_HMBA48h_vs_Control48h)[i], "_top10_dotplot.tiff"),
+         path = paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
   
   # clustered results
@@ -930,16 +982,24 @@ for (i in 1:length(pathfindR_outputs_HMBA48h_vs_Control48h)){
                                                                             top_terms = NULL,
                                                                             plot_by_cluster = TRUE)+
     scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
-    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
-          axis.text.y = element_text(color = "black", size = 12),
-          axis.text.x = element_text(color = "black", size = 14),
-          axis.title.x = element_text(size = 15, face = "bold"))+
+    scale_size(range = c(0.1, 2)) +
+    theme(plot.title = element_text(size = 5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 3.5),
+          axis.title.x = element_text(size = 4.5, face = "bold"),
+          legend.key.size = unit(1.5, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 3.5, face = "bold"),
+          legend.text = element_text(size = 2.75))+
     labs(title = paste0("Top 10 clustered ", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i],
                         " terms enrichment dotplot - (", comparisons["HMBA48h_vs_Control48h"], ")"))
-  tiff(paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "/",
-              names(pathfindR_outputs_HMBA48h_vs_Control48h)[i], "_top10_dotplot_clustered.tiff"), 
-       width = 9600, height = 5400, res = 700, compression = "lzw")
   print(cluster_enrichment_dotplots_HMBA48h_vs_Control48h[[i]])
+  ggsave(filename = paste0(names(pathfindR_outputs_HMBA48h_vs_Control48h)[i], "_top10_dotplot_clustered.tiff"),
+         path = paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
 }
 
@@ -974,46 +1034,71 @@ for (i in 1:length(pathfindR_outputs_HMBA48h_vs_Control48h)){
   # term-gene heatmaps
   term_gene_heatmaps_HMBA48h_vs_Control48h[[i]] = term_gene_heatmap(result_df = wrapped_pathfindR_outputs_HMBA48h_vs_Control48h[[i]],
                                                                     genes_df = pathf_input_HMBA48h_vs_Control48h,
-                                                                    num_terms = 5,
+                                                                    num_terms = 10,
                                                                     use_description = TRUE,
-                                                                    low = "darkgreen",
-                                                                    high = "darkred",
-                                                                    mid = "black")+
-    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
-          axis.text.x = element_text(size = axis_text_size[i], vjust = 0.5, color = "black"),
-          axis.text.y = element_text(size = 13),
-          legend.title = element_text(size = 13),
+                                                                    low = "darkblue",
+                                                                    high = "red",
+                                                                    mid = "white",
+                                                                    pin_name_path = path2SIF)+
+    theme(plot.title = element_text(size = 4.5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 2.5,  vjust = 0.5),
+          axis.title.x = element_text(size = 5, face = "bold"),
+          legend.key.size = unit(3, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
           legend.title.align = 0.5,
           legend.direction = "vertical") +
-    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], 
+    scale_fill_gradient2(name = "logFC",
+                         low = "darkblue", mid = "white", na.value = "white",
+                         high = "red") +
+    labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], 
                         " terms - differentially expressed genes heatmap (",
                         comparisons["HMBA48h_vs_Control48h"], ")"),
          fill = expression(log[2] ~ "FoldChange"))
-  tiff(paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "/",
-              names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "_top5_term_gene_heatmap.tiff"), 
-       width = 17920, height = 3024, res = 700, compression = "lzw")
   print(ggdraw(align_legend(term_gene_heatmaps_HMBA48h_vs_Control48h[[i]], hjust = 0.5)))
+  ggsave(filename = paste0(names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i],
+                           "_top10_term_gene_heatmap.tiff"),
+         path = paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
   
   # term-gene graphs
   term_gene_graphs_HMBA48h_vs_Control48h[[i]] = term_gene_graph(result_df = pathfindR_outputs_HMBA48h_vs_Control48h[[i]],
-                                                                num_terms = 3,
+                                                                num_terms = 5,
                                                                 use_description = TRUE,
                                                                 node_size = "p_val")+
-    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
-          plot.subtitle = element_text(size = 15, face = "bold", hjust = 0.5, vjust = 0.5),
-          legend.title = element_text(size = 15),
+    aes(max.overlaps = 5)+
+    scale_size(range = c(1, 3)) +
+    suppressWarnings(ggraph::geom_node_text(ggplot2::aes_(label = ~name),  nudge_y = .1,
+                                            repel = TRUE, size = 1, max.overlaps = 10, check_overlap = T))+
+    theme(plot.title = element_text(size = 6, face = "bold", hjust = 0.5, vjust = 0.5),
+          plot.background = element_rect(fill = "white"),
+          plot.subtitle = element_text(size = 4.5, face = "italic", hjust = 0.5, vjust = 1.5),
+          legend.key.size = unit(2, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
           legend.title.align = 0.5,
-          legend.direction = "vertical",
-          legend.text = element_text(size = 13))+
-    labs(title = paste0("Top 3 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], 
+          legend.direction = "vertical")+
+    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], 
                         " term - gene graph (",
-                        comparisons["HMBA48h_vs_Control48h"], ")"),
-         fill = expression(log[2] ~ "FoldChange"))
-  tiff(paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "/",
-              names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "_top3_term_gene_graph.tiff"), 
-       width = 1920*7, height = 1080*7, res = 700, compression ="lzw")
+                        comparisons["HMBA48h_vs_Control48h"], ")"))
+  term_gene_graphs_HMBA48h_vs_Control48h[[i]]$layers = list(term_gene_graphs_HMBA48h_vs_Control48h[[i]]$layers[[1]], 
+                                                            term_gene_graphs_HMBA48h_vs_Control48h[[i]]$layers[[2]], 
+                                                            term_gene_graphs_HMBA48h_vs_Control48h[[i]]$layers[[4]])
   print(term_gene_graphs_HMBA48h_vs_Control48h[[i]])
+  ggsave(filename = paste0(names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i],
+                           "_top5_term_gene_graph.tiff"),
+         path = paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "/"),
+         width = 1920*2.5, height = 1080*2.5, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
 }
 
@@ -1027,11 +1112,26 @@ for (i in 1:length(pathfindR_outputs_HMBA48h_vs_Control48h)){
                                                       use_description = TRUE,
                                                       low = "darkgreen",
                                                       high = "darkred",
-                                                      mid = "black")+
-    theme(axis.text.y = element_text(size = axis_text_size[[i]]))
+                                                      mid = "white")+
+    theme(plot.title = element_text(size = 6, face = "bold", hjust = 0.5, vjust = 0.5),
+          axis.text.y = element_text(size = 3),
+          legend.key.size = unit(2, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
+          legend.title.align = 0.5,
+          legend.direction = "vertical")+
+    ggupset::theme_combmatrix(combmatrix.panel.point.color.fill = "black",
+                              combmatrix.panel.point.size = 0.8,
+                              combmatrix.panel.line.size = 0.5)+
+    labs(fill = "logFC",
+         title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], 
+                        " term - UpSet plot (",
+                        comparisons["HMBA48h_vs_Control48h"], ")"))
   tiff(paste0("Pathways/HMBA48h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "/",
               names(wrapped_pathfindR_outputs_HMBA48h_vs_Control48h)[i], "_top5_UpSet_plot.tiff"), 
-       width = 6740, height = 17920, res = 700, compression = "lzw")
+       width = 2880, height = 1620*4, res = 700, compression = "lzw")
   print(UpSet_plots_HMBA48h_vs_Control48h[[i]])
   dev.off()
 }
@@ -1112,16 +1212,24 @@ for (i in 1:length(pathfindR_outputs_HMBA48h_vs_HMBA24h)){
   enrichment_dotplots_HMBA48h_vs_HMBA24h[[i]] = enrichment_chart(result_df = wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h[[i]],
                                                                  top_terms = 10)+
     scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
-    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
-          axis.text.y = element_text(color = "black", size = 14),
-          axis.text.x = element_text(color = "black", size = 14),
-          axis.title.x = element_text(size = 15, face = "bold"))+
+    scale_size(range = c(0.1, 2)) +
+    theme(plot.title = element_text(size = 5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 3.5),
+          axis.title.x = element_text(size = 4.5, face = "bold"),
+          legend.key.size = unit(1.5, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 3.5, face = "bold"),
+          legend.text = element_text(size = 2.75))+
     labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i],
                         " terms enrichment dotplot - (", comparisons["HMBA48h_vs_HMBA24h"], ")"))
-  tiff(paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "/",
-              names(pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "_top10_dotplot.tiff"), 
-       width = 9600, height = 5400, res = 700, compression = "lzw")
   print(enrichment_dotplots_HMBA48h_vs_HMBA24h[[i]])
+  ggsave(filename = paste0(names(pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "_top10_dotplot.tiff"),
+         path = paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
   
   # clustered results
@@ -1130,16 +1238,24 @@ for (i in 1:length(pathfindR_outputs_HMBA48h_vs_HMBA24h)){
                                                                          top_terms = NULL,
                                                                          plot_by_cluster = TRUE)+
     scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
-    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
-          axis.text.y = element_text(color = "black", size = 12),
-          axis.text.x = element_text(color = "black", size = 14),
-          axis.title.x = element_text(size = 15, face = "bold"))+
+    scale_size(range = c(0.1, 2)) +
+    theme(plot.title = element_text(size = 5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 3.5),
+          axis.title.x = element_text(size = 4.5, face = "bold"),
+          legend.key.size = unit(1.5, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 3.5, face = "bold"),
+          legend.text = element_text(size = 2.75))+
     labs(title = paste0("Top 10 clustered ", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i],
                         " terms enrichment dotplot - (", comparisons["HMBA48h_vs_HMBA24h"], ")"))
-  tiff(paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "/",
-              names(pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "_top10_dotplot_clustered.tiff"), 
-       width = 9600, height = 5400, res = 700, compression = "lzw")
   print(cluster_enrichment_dotplots_HMBA48h_vs_HMBA24h[[i]])
+  ggsave(filename = paste0(names(pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "_top10_dotplot_clustered.tiff"),
+         path = paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
 }
 
@@ -1174,46 +1290,71 @@ for (i in 1:length(pathfindR_outputs_HMBA48h_vs_HMBA24h)){
   # term-gene heatmaps
   term_gene_heatmaps_HMBA48h_vs_HMBA24h[[i]] = term_gene_heatmap(result_df = wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h[[i]],
                                                                  genes_df = pathf_input_HMBA48h_vs_HMBA24h,
-                                                                 num_terms = 5,
+                                                                 num_terms = 10,
                                                                  use_description = TRUE,
-                                                                 low = "darkgreen",
-                                                                 high = "darkred",
-                                                                 mid = "black")+
-    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
-          axis.text.x = element_text(size = axis_text_size[i], vjust = 0.5, color = "black"),
-          axis.text.y = element_text(size = 13),
-          legend.title = element_text(size = 13),
+                                                                 low = "darkblue",
+                                                                 high = "red",
+                                                                 mid = "white",
+                                                                 pin_name_path = path2SIF)+
+    theme(plot.title = element_text(size = 4.5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 2.5,  vjust = 0.5),
+          axis.title.x = element_text(size = 5, face = "bold"),
+          legend.key.size = unit(3, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
           legend.title.align = 0.5,
           legend.direction = "vertical") +
-    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], 
+    scale_fill_gradient2(name = "logFC",
+                         low = "darkblue", mid = "white", na.value = "white",
+                         high = "red") +
+    labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], 
                         " terms - differentially expressed genes heatmap (",
                         comparisons["HMBA48h_vs_HMBA24h"], ")"),
          fill = expression(log[2] ~ "FoldChange"))
-  tiff(paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "/",
-              names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "_top5_term_gene_heatmap.tiff"), 
-       width = 17920, height = 3024, res = 700, compression = "lzw")
   print(ggdraw(align_legend(term_gene_heatmaps_HMBA48h_vs_HMBA24h[[i]], hjust = 0.5)))
+  ggsave(filename = paste0(names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i],
+                           "_top10_term_gene_heatmap.tiff"),
+         path = paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
   
   # term-gene graphs
   term_gene_graphs_HMBA48h_vs_HMBA24h[[i]] = term_gene_graph(result_df = pathfindR_outputs_HMBA48h_vs_HMBA24h[[i]],
-                                                             num_terms = 3,
+                                                             num_terms = 5,
                                                              use_description = TRUE,
                                                              node_size = "p_val")+
-    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
-          plot.subtitle = element_text(size = 15, face = "bold", hjust = 0.5, vjust = 0.5),
-          legend.title = element_text(size = 15),
+    aes(max.overlaps = 5)+
+    scale_size(range = c(1, 3)) +
+    suppressWarnings(ggraph::geom_node_text(ggplot2::aes_(label = ~name),  nudge_y = .1,
+                                            repel = TRUE, size = 1, max.overlaps = 10, check_overlap = T))+
+    theme(plot.title = element_text(size = 6, face = "bold", hjust = 0.5, vjust = 0.5),
+          plot.background = element_rect(fill = "white"),
+          plot.subtitle = element_text(size = 4.5, face = "italic", hjust = 0.5, vjust = 1.5),
+          legend.key.size = unit(2, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
           legend.title.align = 0.5,
-          legend.direction = "vertical",
-          legend.text = element_text(size = 13))+
-    labs(title = paste0("Top 3 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], 
+          legend.direction = "vertical")+
+    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], 
                         " term - gene graph (",
-                        comparisons["HMBA48h_vs_HMBA24h"], ")"),
-         fill = expression(log[2] ~ "FoldChange"))
-  tiff(paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "/",
-              names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "_top3_term_gene_graph.tiff"), 
-       width = 1920*7, height = 1080*7, res = 700, compression ="lzw")
+                        comparisons["HMBA48h_vs_HMBA24h"], ")"))
+  term_gene_graphs_HMBA48h_vs_HMBA24h[[i]]$layers = list(term_gene_graphs_HMBA48h_vs_HMBA24h[[i]]$layers[[1]], 
+                                                         term_gene_graphs_HMBA48h_vs_HMBA24h[[i]]$layers[[2]], 
+                                                         term_gene_graphs_HMBA48h_vs_HMBA24h[[i]]$layers[[4]])
   print(term_gene_graphs_HMBA48h_vs_HMBA24h[[i]])
+  ggsave(filename = paste0(names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i],
+                           "_top5_term_gene_graph.tiff"),
+         path = paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "/"),
+         width = 1920*2.5, height = 1080*2.5, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
 }
 
@@ -1227,11 +1368,26 @@ for (i in 1:length(pathfindR_outputs_HMBA48h_vs_HMBA24h)){
                                                    use_description = TRUE,
                                                    low = "darkgreen",
                                                    high = "darkred",
-                                                   mid = "black")+
-    theme(axis.text.y = element_text(size = axis_text_size[[i]]))
+                                                   mid = "white")+
+    theme(plot.title = element_text(size = 6, face = "bold", hjust = 0.5, vjust = 0.5),
+          axis.text.y = element_text(size = 3),
+          legend.key.size = unit(2, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
+          legend.title.align = 0.5,
+          legend.direction = "vertical")+
+    ggupset::theme_combmatrix(combmatrix.panel.point.color.fill = "black",
+                              combmatrix.panel.point.size = 0.8,
+                              combmatrix.panel.line.size = 0.5)+
+    labs(fill = "logFC",
+         title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], 
+                        " term - UpSet plot (",
+                        comparisons["HMBA48h_vs_HMBA24h"], ")"))
   tiff(paste0("Pathways/HMBA48h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "/",
               names(wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h)[i], "_top5_UpSet_plot.tiff"), 
-       width = 6740, height = 17920, res = 700, compression = "lzw")
+       width = 2880, height = 1620*4, res = 700, compression = "lzw")
   print(UpSet_plots_HMBA48h_vs_HMBA24h[[i]])
   dev.off()
 }
@@ -1312,16 +1468,24 @@ for (i in 1:length(pathfindR_outputs_HMBA72h_vs_Control48h)){
   enrichment_dotplots_HMBA72h_vs_Control48h[[i]] = enrichment_chart(result_df = wrapped_pathfindR_outputs_HMBA72h_vs_Control48h[[i]],
                                                                     top_terms = 10)+
     scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
-    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
-          axis.text.y = element_text(color = "black", size = 14),
-          axis.text.x = element_text(color = "black", size = 14),
-          axis.title.x = element_text(size = 15, face = "bold"))+
+    scale_size(range = c(0.1, 2)) +
+    theme(plot.title = element_text(size = 5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 3.5),
+          axis.title.x = element_text(size = 4.5, face = "bold"),
+          legend.key.size = unit(1.5, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 3.5, face = "bold"),
+          legend.text = element_text(size = 2.75))+
     labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i],
                         " terms enrichment dotplot - (", comparisons["HMBA72h_vs_Control48h"], ")"))
-  tiff(paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "/",
-              names(pathfindR_outputs_HMBA72h_vs_Control48h)[i], "_top10_dotplot.tiff"), 
-       width = 9600, height = 5400, res = 700, compression = "lzw")
   print(enrichment_dotplots_HMBA72h_vs_Control48h[[i]])
+  ggsave(filename = paste0(names(pathfindR_outputs_HMBA72h_vs_Control48h)[i], "_top10_dotplot.tiff"),
+         path = paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
   
   # clustered results
@@ -1330,16 +1494,24 @@ for (i in 1:length(pathfindR_outputs_HMBA72h_vs_Control48h)){
                                                                             top_terms = NULL,
                                                                             plot_by_cluster = TRUE)+
     scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
-    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
-          axis.text.y = element_text(color = "black", size = 12),
-          axis.text.x = element_text(color = "black", size = 14),
-          axis.title.x = element_text(size = 15, face = "bold"))+
+    scale_size(range = c(0.1, 2)) +
+    theme(plot.title = element_text(size = 5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 3.5),
+          axis.title.x = element_text(size = 4.5, face = "bold"),
+          legend.key.size = unit(1.5, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 3.5, face = "bold"),
+          legend.text = element_text(size = 2.75))+
     labs(title = paste0("Top 10 clustered ", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i],
                         " terms enrichment dotplot - (", comparisons["HMBA72h_vs_Control48h"], ")"))
-  tiff(paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "/",
-              names(pathfindR_outputs_HMBA72h_vs_Control48h)[i], "_top10_dotplot_clustered.tiff"), 
-       width = 9600, height = 5400, res = 700, compression = "lzw")
   print(cluster_enrichment_dotplots_HMBA72h_vs_Control48h[[i]])
+  ggsave(filename = paste0(names(pathfindR_outputs_HMBA72h_vs_Control48h)[i], "_top10_dotplot_clustered.tiff"),
+         path = paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
 }
 
@@ -1374,46 +1546,71 @@ for (i in 1:length(pathfindR_outputs_HMBA72h_vs_Control48h)){
   # term-gene heatmaps
   term_gene_heatmaps_HMBA72h_vs_Control48h[[i]] = term_gene_heatmap(result_df = wrapped_pathfindR_outputs_HMBA72h_vs_Control48h[[i]],
                                                                     genes_df = pathf_input_HMBA72h_vs_Control48h,
-                                                                    num_terms = 5,
+                                                                    num_terms = 10,
                                                                     use_description = TRUE,
-                                                                    low = "darkgreen",
-                                                                    high = "darkred",
-                                                                    mid = "black")+
-    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
-          axis.text.x = element_text(size = axis_text_size[i], vjust = 0.5, color = "black"),
-          axis.text.y = element_text(size = 13),
-          legend.title = element_text(size = 13),
+                                                                    low = "darkblue",
+                                                                    high = "red",
+                                                                    mid = "white",
+                                                                    pin_name_path = path2SIF)+
+    theme(plot.title = element_text(size = 4.5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 2.5,  vjust = 0.5),
+          axis.title.x = element_text(size = 5, face = "bold"),
+          legend.key.size = unit(3, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
           legend.title.align = 0.5,
           legend.direction = "vertical") +
-    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], 
+    scale_fill_gradient2(name = "logFC",
+                         low = "darkblue", mid = "white", na.value = "white",
+                         high = "red") +
+    labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], 
                         " terms - differentially expressed genes heatmap (",
                         comparisons["HMBA72h_vs_Control48h"], ")"),
          fill = expression(log[2] ~ "FoldChange"))
-  tiff(paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "/",
-              names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "_top5_term_gene_heatmap.tiff"), 
-       width = 17920, height = 3024, res = 700, compression = "lzw")
   print(ggdraw(align_legend(term_gene_heatmaps_HMBA72h_vs_Control48h[[i]], hjust = 0.5)))
+  ggsave(filename = paste0(names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i],
+                           "_top10_term_gene_heatmap.tiff"),
+         path = paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
   
   # term-gene graphs
   term_gene_graphs_HMBA72h_vs_Control48h[[i]] = term_gene_graph(result_df = pathfindR_outputs_HMBA72h_vs_Control48h[[i]],
-                                                                num_terms = 3,
+                                                                num_terms = 5,
                                                                 use_description = TRUE,
                                                                 node_size = "p_val")+
-    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
-          plot.subtitle = element_text(size = 15, face = "bold", hjust = 0.5, vjust = 0.5),
-          legend.title = element_text(size = 15),
+    aes(max.overlaps = 5)+
+    scale_size(range = c(1, 3)) +
+    suppressWarnings(ggraph::geom_node_text(ggplot2::aes_(label = ~name),  nudge_y = .1,
+                                            repel = TRUE, size = 1, max.overlaps = 10, check_overlap = T))+
+    theme(plot.title = element_text(size = 6, face = "bold", hjust = 0.5, vjust = 0.5),
+          plot.background = element_rect(fill = "white"),
+          plot.subtitle = element_text(size = 4.5, face = "italic", hjust = 0.5, vjust = 1.5),
+          legend.key.size = unit(2, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
           legend.title.align = 0.5,
-          legend.direction = "vertical",
-          legend.text = element_text(size = 13))+
-    labs(title = paste0("Top 3 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], 
+          legend.direction = "vertical")+
+    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], 
                         " term - gene graph (",
-                        comparisons["HMBA72h_vs_Control48h"], ")"),
-         fill = expression(log[2] ~ "FoldChange"))
-  tiff(paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "/",
-              names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "_top3_term_gene_graph.tiff"), 
-       width = 1920*7, height = 1080*7, res = 700, compression ="lzw")
+                        comparisons["HMBA72h_vs_Control48h"], ")"))
+  term_gene_graphs_HMBA72h_vs_Control48h[[i]]$layers = list(term_gene_graphs_HMBA72h_vs_Control48h[[i]]$layers[[1]], 
+                                                            term_gene_graphs_HMBA72h_vs_Control48h[[i]]$layers[[2]], 
+                                                            term_gene_graphs_HMBA72h_vs_Control48h[[i]]$layers[[4]])
   print(term_gene_graphs_HMBA72h_vs_Control48h[[i]])
+  ggsave(filename = paste0(names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i],
+                           "_top5_term_gene_graph.tiff"),
+         path = paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "/"),
+         width = 1920*2.5, height = 1080*2.5, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
 }
 
@@ -1427,11 +1624,26 @@ for (i in 1:length(pathfindR_outputs_HMBA72h_vs_Control48h)){
                                                       use_description = TRUE,
                                                       low = "darkgreen",
                                                       high = "darkred",
-                                                      mid = "black")+
-    theme(axis.text.y = element_text(size = axis_text_size[[i]]))
+                                                      mid = "white")+
+    theme(plot.title = element_text(size = 6, face = "bold", hjust = 0.5, vjust = 0.5),
+          axis.text.y = element_text(size = 3),
+          legend.key.size = unit(2, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
+          legend.title.align = 0.5,
+          legend.direction = "vertical")+
+    ggupset::theme_combmatrix(combmatrix.panel.point.color.fill = "black",
+                              combmatrix.panel.point.size = 0.8,
+                              combmatrix.panel.line.size = 0.5)+
+    labs(fill = "logFC",
+         title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], 
+                        " term - UpSet plot (",
+                        comparisons["HMBA72h_vs_Control48h"], ")"))
   tiff(paste0("Pathways/HMBA72h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "/",
               names(wrapped_pathfindR_outputs_HMBA72h_vs_Control48h)[i], "_top5_UpSet_plot.tiff"), 
-       width = 6740, height = 17920, res = 700, compression = "lzw")
+       width = 2880, height = 1620*4, res = 700, compression = "lzw")
   print(UpSet_plots_HMBA72h_vs_Control48h[[i]])
   dev.off()
 }
@@ -1512,16 +1724,24 @@ for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA24h)){
   enrichment_dotplots_HMBA72h_vs_HMBA24h[[i]] = enrichment_chart(result_df = wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h[[i]],
                                                                  top_terms = 10)+
     scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
-    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
-          axis.text.y = element_text(color = "black", size = 14),
-          axis.text.x = element_text(color = "black", size = 14),
-          axis.title.x = element_text(size = 15, face = "bold"))+
+    scale_size(range = c(0.1, 2)) +
+    theme(plot.title = element_text(size = 5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 3.5),
+          axis.title.x = element_text(size = 4.5, face = "bold"),
+          legend.key.size = unit(1.5, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 3.5, face = "bold"),
+          legend.text = element_text(size = 2.75))+
     labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i],
                         " terms enrichment dotplot - (", comparisons["HMBA72h_vs_HMBA24h"], ")"))
-  tiff(paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "/",
-              names(pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "_top10_dotplot.tiff"), 
-       width = 9600, height = 5400, res = 700, compression = "lzw")
   print(enrichment_dotplots_HMBA72h_vs_HMBA24h[[i]])
+  ggsave(filename = paste0(names(pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "_top10_dotplot.tiff"),
+         path = paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
   
   # clustered results
@@ -1530,16 +1750,24 @@ for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA24h)){
                                                                          top_terms = NULL,
                                                                          plot_by_cluster = TRUE)+
     scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
-    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
-          axis.text.y = element_text(color = "black", size = 12),
-          axis.text.x = element_text(color = "black", size = 14),
-          axis.title.x = element_text(size = 15, face = "bold"))+
+    scale_size(range = c(0.1, 2)) +
+    theme(plot.title = element_text(size = 5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 3.5),
+          axis.title.x = element_text(size = 4.5, face = "bold"),
+          legend.key.size = unit(1.5, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 3.5, face = "bold"),
+          legend.text = element_text(size = 2.75))+
     labs(title = paste0("Top 10 clustered ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i],
                         " terms enrichment dotplot - (", comparisons["HMBA72h_vs_HMBA24h"], ")"))
-  tiff(paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "/",
-              names(pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "_top10_dotplot_clustered.tiff"), 
-       width = 9600, height = 5400, res = 700, compression = "lzw")
   print(cluster_enrichment_dotplots_HMBA72h_vs_HMBA24h[[i]])
+  ggsave(filename = paste0(names(pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "_top10_dotplot_clustered.tiff"),
+         path = paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
 }
 
@@ -1574,46 +1802,71 @@ for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA24h)){
   # term-gene heatmaps
   term_gene_heatmaps_HMBA72h_vs_HMBA24h[[i]] = term_gene_heatmap(result_df = wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h[[i]],
                                                                  genes_df = pathf_input_HMBA72h_vs_HMBA24h,
-                                                                 num_terms = 5,
+                                                                 num_terms = 10,
                                                                  use_description = TRUE,
-                                                                 low = "darkgreen",
-                                                                 high = "darkred",
-                                                                 mid = "black")+
-    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
-          axis.text.x = element_text(size = axis_text_size[i], vjust = 0.5, color = "black"),
-          axis.text.y = element_text(size = 13),
-          legend.title = element_text(size = 13),
+                                                                 low = "darkblue",
+                                                                 high = "red",
+                                                                 mid = "white",
+                                                                 pin_name_path = path2SIF)+
+    theme(plot.title = element_text(size = 4.5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 2.5,  vjust = 0.5),
+          axis.title.x = element_text(size = 5, face = "bold"),
+          legend.key.size = unit(3, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
           legend.title.align = 0.5,
           legend.direction = "vertical") +
-    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], 
+    scale_fill_gradient2(name = "logFC",
+                         low = "darkblue", mid = "white", na.value = "white",
+                         high = "red") +
+    labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], 
                         " terms - differentially expressed genes heatmap (",
                         comparisons["HMBA72h_vs_HMBA24h"], ")"),
          fill = expression(log[2] ~ "FoldChange"))
-  tiff(paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "/",
-              names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "_top5_term_gene_heatmap.tiff"), 
-       width = 17920, height = 3024, res = 700, compression = "lzw")
   print(ggdraw(align_legend(term_gene_heatmaps_HMBA72h_vs_HMBA24h[[i]], hjust = 0.5)))
+  ggsave(filename = paste0(names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i],
+                           "_top10_term_gene_heatmap.tiff"),
+         path = paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
   
   # term-gene graphs
   term_gene_graphs_HMBA72h_vs_HMBA24h[[i]] = term_gene_graph(result_df = pathfindR_outputs_HMBA72h_vs_HMBA24h[[i]],
-                                                             num_terms = 3,
+                                                             num_terms = 5,
                                                              use_description = TRUE,
                                                              node_size = "p_val")+
-    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
-          plot.subtitle = element_text(size = 15, face = "bold", hjust = 0.5, vjust = 0.5),
-          legend.title = element_text(size = 15),
+    aes(max.overlaps = 5)+
+    scale_size(range = c(1, 3)) +
+    suppressWarnings(ggraph::geom_node_text(ggplot2::aes_(label = ~name),  nudge_y = .1,
+                                            repel = TRUE, size = 1, max.overlaps = 10, check_overlap = T))+
+    theme(plot.title = element_text(size = 6, face = "bold", hjust = 0.5, vjust = 0.5),
+          plot.background = element_rect(fill = "white"),
+          plot.subtitle = element_text(size = 4.5, face = "italic", hjust = 0.5, vjust = 1.5),
+          legend.key.size = unit(2, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
           legend.title.align = 0.5,
-          legend.direction = "vertical",
-          legend.text = element_text(size = 13))+
-    labs(title = paste0("Top 3 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], 
+          legend.direction = "vertical")+
+    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], 
                         " term - gene graph (",
-                        comparisons["HMBA72h_vs_HMBA24h"], ")"),
-         fill = expression(log[2] ~ "FoldChange"))
-  tiff(paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "/",
-              names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "_top3_term_gene_graph.tiff"), 
-       width = 1920*7, height = 1080*7, res = 700, compression ="lzw")
+                        comparisons["HMBA72h_vs_HMBA24h"], ")"))
+  term_gene_graphs_HMBA72h_vs_HMBA24h[[i]]$layers = list(term_gene_graphs_HMBA72h_vs_HMBA24h[[i]]$layers[[1]], 
+                                                         term_gene_graphs_HMBA72h_vs_HMBA24h[[i]]$layers[[2]], 
+                                                         term_gene_graphs_HMBA72h_vs_HMBA24h[[i]]$layers[[4]])
   print(term_gene_graphs_HMBA72h_vs_HMBA24h[[i]])
+  ggsave(filename = paste0(names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i],
+                           "_top5_term_gene_graph.tiff"),
+         path = paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "/"),
+         width = 1920*2.5, height = 1080*2.5, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
 }
 
@@ -1627,11 +1880,26 @@ for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA24h)){
                                                    use_description = TRUE,
                                                    low = "darkgreen",
                                                    high = "darkred",
-                                                   mid = "black")+
-    theme(axis.text.y = element_text(size = axis_text_size[[i]]))
+                                                   mid = "white")+
+    theme(plot.title = element_text(size = 6, face = "bold", hjust = 0.5, vjust = 0.5),
+          axis.text.y = element_text(size = 3),
+          legend.key.size = unit(2, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
+          legend.title.align = 0.5,
+          legend.direction = "vertical")+
+    ggupset::theme_combmatrix(combmatrix.panel.point.color.fill = "black",
+                              combmatrix.panel.point.size = 0.8,
+                              combmatrix.panel.line.size = 0.5)+
+    labs(fill = "logFC",
+         title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], 
+                        " term - UpSet plot (",
+                        comparisons["HMBA72h_vs_HMBA24h"], ")"))
   tiff(paste0("Pathways/HMBA72h_vs_HMBA24h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "/",
               names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h)[i], "_top5_UpSet_plot.tiff"), 
-       width = 6740, height = 17920, res = 700, compression = "lzw")
+       width = 2880, height = 1620*4, res = 700, compression = "lzw")
   print(UpSet_plots_HMBA72h_vs_HMBA24h[[i]])
   dev.off()
 }
@@ -1712,16 +1980,24 @@ for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA48h)){
   enrichment_dotplots_HMBA72h_vs_HMBA48h[[i]] = enrichment_chart(result_df = wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h[[i]],
                                                                  top_terms = 10)+
     scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
-    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
-          axis.text.y = element_text(color = "black", size = 14),
-          axis.text.x = element_text(color = "black", size = 14),
-          axis.title.x = element_text(size = 15, face = "bold"))+
+    scale_size(range = c(0.1, 2)) +
+    theme(plot.title = element_text(size = 5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 3.5),
+          axis.title.x = element_text(size = 4.5, face = "bold"),
+          legend.key.size = unit(1.5, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 3.5, face = "bold"),
+          legend.text = element_text(size = 2.75))+
     labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i],
                         " terms enrichment dotplot - (", comparisons["HMBA72h_vs_HMBA48h"], ")"))
-  tiff(paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "/",
-              names(pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "_top10_dotplot.tiff"), 
-       width = 9600, height = 5400, res = 700, compression = "lzw")
   print(enrichment_dotplots_HMBA72h_vs_HMBA48h[[i]])
+  ggsave(filename = paste0(names(pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "_top10_dotplot.tiff"),
+         path = paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
   
   # clustered results
@@ -1730,16 +2006,24 @@ for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA48h)){
                                                                          top_terms = NULL,
                                                                          plot_by_cluster = TRUE)+
     scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
-    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
-          axis.text.y = element_text(color = "black", size = 12),
-          axis.text.x = element_text(color = "black", size = 14),
-          axis.title.x = element_text(size = 15, face = "bold"))+
+    scale_size(range = c(0.1, 2)) +
+    theme(plot.title = element_text(size = 5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 3.5),
+          axis.title.x = element_text(size = 4.5, face = "bold"),
+          legend.key.size = unit(1.5, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 3.5, face = "bold"),
+          legend.text = element_text(size = 2.75))+
     labs(title = paste0("Top 10 clustered ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i],
                         " terms enrichment dotplot - (", comparisons["HMBA72h_vs_HMBA48h"], ")"))
-  tiff(paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "/",
-              names(pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "_top10_dotplot_clustered.tiff"), 
-       width = 9600, height = 5400, res = 700, compression = "lzw")
   print(cluster_enrichment_dotplots_HMBA72h_vs_HMBA48h[[i]])
+  ggsave(filename = paste0(names(pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "_top10_dotplot_clustered.tiff"),
+         path = paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
 }
 
@@ -1774,46 +2058,71 @@ for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA48h)){
   # term-gene heatmaps
   term_gene_heatmaps_HMBA72h_vs_HMBA48h[[i]] = term_gene_heatmap(result_df = wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h[[i]],
                                                                  genes_df = pathf_input_HMBA72h_vs_HMBA48h,
-                                                                 num_terms = 5,
+                                                                 num_terms = 10,
                                                                  use_description = TRUE,
-                                                                 low = "darkgreen",
-                                                                 high = "darkred",
-                                                                 mid = "black")+
-    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
-          axis.text.x = element_text(size = axis_text_size[i], vjust = 0.5, color = "black"),
-          axis.text.y = element_text(size = 13),
-          legend.title = element_text(size = 13),
+                                                                 low = "darkblue",
+                                                                 high = "red",
+                                                                 mid = "white",
+                                                                 pin_name_path = path2SIF)+
+    theme(plot.title = element_text(size = 4.5, face = "bold", vjust = 2, hjust = 0.5),
+          axis.text.y = element_text(color = "black", size = 3.5),
+          axis.text.x = element_text(color = "black", size = 2.5,  vjust = 0.5),
+          axis.title.x = element_text(size = 5, face = "bold"),
+          legend.key.size = unit(3, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
           legend.title.align = 0.5,
           legend.direction = "vertical") +
-    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], 
+    scale_fill_gradient2(name = "logFC",
+                         low = "darkblue", mid = "white", na.value = "white",
+                         high = "red") +
+    labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], 
                         " terms - differentially expressed genes heatmap (",
                         comparisons["HMBA72h_vs_HMBA48h"], ")"),
          fill = expression(log[2] ~ "FoldChange"))
-  tiff(paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "/",
-              names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "_top5_term_gene_heatmap.tiff"), 
-       width = 17920, height = 3024, res = 700, compression = "lzw")
   print(ggdraw(align_legend(term_gene_heatmaps_HMBA72h_vs_HMBA48h[[i]], hjust = 0.5)))
+  ggsave(filename = paste0(names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i],
+                           "_top10_term_gene_heatmap.tiff"),
+         path = paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
   
   # term-gene graphs
   term_gene_graphs_HMBA72h_vs_HMBA48h[[i]] = term_gene_graph(result_df = pathfindR_outputs_HMBA72h_vs_HMBA48h[[i]],
-                                                             num_terms = 3,
+                                                             num_terms = 5,
                                                              use_description = TRUE,
                                                              node_size = "p_val")+
-    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5, vjust = 0.5),
-          plot.subtitle = element_text(size = 15, face = "bold", hjust = 0.5, vjust = 0.5),
-          legend.title = element_text(size = 15),
+    aes(max.overlaps = 5)+
+    scale_size(range = c(1, 3)) +
+    suppressWarnings(ggraph::geom_node_text(ggplot2::aes_(label = ~name),  nudge_y = .1,
+                                            repel = TRUE, size = 1, max.overlaps = 10, check_overlap = T))+
+    theme(plot.title = element_text(size = 6, face = "bold", hjust = 0.5, vjust = 0.5),
+          plot.background = element_rect(fill = "white"),
+          plot.subtitle = element_text(size = 4.5, face = "italic", hjust = 0.5, vjust = 1.5),
+          legend.key.size = unit(2, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
           legend.title.align = 0.5,
-          legend.direction = "vertical",
-          legend.text = element_text(size = 13))+
-    labs(title = paste0("Top 3 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], 
+          legend.direction = "vertical")+
+    labs(title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], 
                         " term - gene graph (",
-                        comparisons["HMBA72h_vs_HMBA48h"], ")"),
-         fill = expression(log[2] ~ "FoldChange"))
-  tiff(paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "/",
-              names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "_top3_term_gene_graph.tiff"), 
-       width = 1920*7, height = 1080*7, res = 700, compression ="lzw")
+                        comparisons["HMBA72h_vs_HMBA48h"], ")"))
+  term_gene_graphs_HMBA72h_vs_HMBA48h[[i]]$layers = list(term_gene_graphs_HMBA72h_vs_HMBA48h[[i]]$layers[[1]], 
+                                                         term_gene_graphs_HMBA72h_vs_HMBA48h[[i]]$layers[[2]], 
+                                                         term_gene_graphs_HMBA72h_vs_HMBA48h[[i]]$layers[[4]])
   print(term_gene_graphs_HMBA72h_vs_HMBA48h[[i]])
+  ggsave(filename = paste0(names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i],
+                           "_top5_term_gene_graph.tiff"),
+         path = paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "/"),
+         width = 1920*2.5, height = 1080*2.5, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
 }
 
@@ -1827,11 +2136,26 @@ for (i in 1:length(pathfindR_outputs_HMBA72h_vs_HMBA48h)){
                                                    use_description = TRUE,
                                                    low = "darkgreen",
                                                    high = "darkred",
-                                                   mid = "black")+
-    theme(axis.text.y = element_text(size = axis_text_size[[i]]))
+                                                   mid = "white")+
+    theme(plot.title = element_text(size = 6, face = "bold", hjust = 0.5, vjust = 0.5),
+          axis.text.y = element_text(size = 3),
+          legend.key.size = unit(2, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 4),
+          legend.title.align = 0.5,
+          legend.direction = "vertical")+
+    ggupset::theme_combmatrix(combmatrix.panel.point.color.fill = "black",
+                              combmatrix.panel.point.size = 0.8,
+                              combmatrix.panel.line.size = 0.5)+
+    labs(fill = "logFC",
+         title = paste0("Top 5 ", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], 
+                        " term - UpSet plot (",
+                        comparisons["HMBA72h_vs_HMBA48h"], ")"))
   tiff(paste0("Pathways/HMBA72h_vs_HMBA48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "/",
               names(wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h)[i], "_top5_UpSet_plot.tiff"), 
-       width = 6740, height = 17920, res = 700, compression = "lzw")
+       width = 2880, height = 1620*4, res = 700, compression = "lzw")
   print(UpSet_plots_HMBA72h_vs_HMBA48h[[i]])
   dev.off()
 }
