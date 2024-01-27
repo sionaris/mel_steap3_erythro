@@ -486,6 +486,12 @@ mmu_MSigDB_GO_MF <- get_gene_sets_list(
   subcollection = "GO:MF",
 )
 
+# KEGG 
+mmu_KEGG_new <- get_gene_sets_list(
+  source = "KEGG",
+  org_code = "mmu"
+)
+
 ## Downloading the STRING PIN file to tempdir
 url <- "https://stringdb-downloads.org/download/protein.links.v12.0/10090.protein.links.v12.0.txt.gz"
 path2file <- file.path(tempdir(check = TRUE), "STRING.txt.gz")
@@ -546,19 +552,35 @@ write.table(mmu_string_pin,
 )
 path2SIF <- normalizePath(path2SIF)
 
-# Visualisations of pathways have been moved to a folder outside the repository
-# due to large size and difficulties with uploading to GitHub
-genes_of_gene_sets = list(mmu_MSigDB_CP_Reactome$gene_sets, mmu_MSigDB_CP_WikiPathways$gene_sets,
-                 mmu_MSigDB_GO_BP$gene_sets, mmu_MSigDB_GO_CC$gene_sets, mmu_MSigDB_GO_MF$gene_sets,
-                 mmu_MSigDB_CP_BioCarta$gene_sets, mmu_kegg_genes)
-descriptions_of_gene_sets = list(mmu_MSigDB_CP_Reactome$descriptions, mmu_MSigDB_CP_WikiPathways$descriptions,
-                                 mmu_MSigDB_GO_BP$descriptions, mmu_MSigDB_GO_CC$descriptions, mmu_MSigDB_GO_MF$descriptions,
-                                 mmu_MSigDB_CP_BioCarta$descriptions, mmu_kegg_descriptions)
-subdirs = names(genes_of_gene_sets) = names(descriptions_of_gene_sets) = 
+# Remove underscores from gene sets
+gsets = list(mmu_MSigDB_CP_Reactome, mmu_MSigDB_CP_WikiPathways, mmu_MSigDB_GO_BP,
+             mmu_MSigDB_GO_CC, mmu_MSigDB_GO_MF, mmu_MSigDB_CP_BioCarta,
+             mmu_KEGG_new)
+for (i in 1:(length(gsets)-1)) {
+  gsets[[i]]$descriptions = gsub("_", " ", gsets[[i]]$descriptions)
+}
+names(gsets) =
   c("MSigDB Reactome", "MSigDB WikiPathways", "MSigDB GO-Biological Processes", 
     "MSigDB GO-Cellular Components", "MSigDB GO-Molecular Functions",
     "MSigDB BioCarta", "KEGG")
 
+# Create lists of gene sets and genes
+genes_of_gene_sets = list(gsets$`MSigDB Reactome`$gene_sets, 
+                          gsets$`MSigDB WikiPathways`$gene_sets,
+                          gsets$`MSigDB GO-Biological Processes`$gene_sets,
+                          gsets$`MSigDB GO-Cellular Components`$gene_sets,
+                          gsets$`MSigDB GO-Molecular Functions`$gene_sets,
+                          gsets$`MSigDB BioCarta`$gene_sets,
+                          gsets$KEGG$gene_sets)
+
+descriptions_of_gene_sets = list(gsets$`MSigDB Reactome`$descriptions,
+                                 gsets$`MSigDB WikiPathways`$descriptions,
+                                 gsets$`MSigDB GO-Biological Processes`$descriptions,
+                                 gsets$`MSigDB GO-Cellular Components`$descriptions,
+                                 gsets$`MSigDB GO-Molecular Functions`$descriptions,
+                                 gsets$`MSigDB BioCarta`$descriptions,
+                                 gsets$KEGG$descriptions)
+subdirs = names(genes_of_gene_sets) = names(descriptions_of_gene_sets) = names(gsets)
 
 # HMBA24h_vs_Control48h #####
 # Loading the input to pathfindR (the stage 1 vs normal topTable output):
@@ -639,16 +661,28 @@ for (i in 1:length(pathfindR_outputs_HMBA24h_vs_Control48h)){
   enrichment_dotplots_HMBA24h_vs_Control48h[[i]] = enrichment_chart(result_df = wrapped_pathfindR_outputs_HMBA24h_vs_Control48h[[i]],
                                                                     top_terms = 10)+
     scale_color_gradient(low = "#fca4a4", high = "#fc0303")+
-    theme(plot.title = element_text(size = 15, face = "bold", vjust = 1),
-          axis.text.y = element_text(color = "black", size = 14),
-          axis.text.x = element_text(color = "black", size = 14),
-          axis.title.x = element_text(size = 15, face = "bold"))+
+    scale_size(range = c(0.1, 2)) +
+    theme(plot.title = element_text(size = 6, face = "bold", vjust = 2, hjust = 0.5),
+          # plot.title.position = "panel",
+          axis.text.y = element_text(color = "black", size = 4),
+          axis.text.x = element_text(color = "black", size = 4),
+          axis.title.x = element_text(size = 5, face = "bold"),
+          legend.key.size = unit(1.5, units = "mm"),
+          legend.spacing.y = unit(0.5, units = "mm"),
+          legend.spacing.x = unit(0.5, units = "mm"),
+          legend.title = element_text(size = 4, face = "bold"),
+          legend.text = element_text(size = 3))+
     labs(title = paste0("Top 10 ", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i],
                         " terms enrichment dotplot - (", comparisons["HMBA24h_vs_Control48h"], ")"))
-  tiff(paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/",
-              names(pathfindR_outputs_HMBA24h_vs_Control48h)[i], "_top10_dotplot.tiff"), 
-       width = 9600, height = 5400, res = 700, compression = "lzw")
+  # tiff(paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/",
+  #            names(pathfindR_outputs_HMBA24h_vs_Control48h)[i], "_top10_dotplot.tiff"), 
+  #     width = 9600, height = 5400, res = 700, compression = "lzw")
   print(enrichment_dotplots_HMBA24h_vs_Control48h[[i]])
+  ggsave(filename = paste0(names(pathfindR_outputs_HMBA24h_vs_Control48h)[i], "_top10_dotplot.tiff"),
+         path = paste0("Pathways/HMBA24h_vs_Control48h/pathfindR/", 
+                       names(wrapped_pathfindR_outputs_HMBA24h_vs_Control48h)[i], "/"),
+         width = 2880, height = 1620, device = 'tiff', units = "px",
+         dpi = 700, compression = "lzw")
   dev.off()
   
   # clustered results
