@@ -1692,13 +1692,13 @@ for (i in 1:length(cluster_names)){
 }
 names(clustered_results_HMBA72h_vs_HMBA24h) = cluster_names
 
-# MSigDB Reactome     : The maximum average silhouette width was 0.35 for k = 100
-# MSigDB WikiPathways : The maximum average silhouette width was 0.12 for k = 90
-# MSigDB GO-BP        : The maximum average silhouette width was 0.12 for k = 150 
-# MSigDB GO-CC        : The maximum average silhouette width was 0.11 for k = 150
-# MSigDB GO-MF        : The maximum average silhouette width was 0.12 for k = 80
-# MSigDB BioCarta     : The maximum average silhouette width was 0.4 for k = 550
-# KEGG                : The maximum average silhouette width was 0.4 for k = 550
+# MSigDB Reactome     : The maximum average silhouette width was 0.33 for k = 150
+# MSigDB WikiPathways : The maximum average silhouette width was 0.11 for k = 80
+# MSigDB GO-BP        : The maximum average silhouette width was 0.39 for k = 350 
+# MSigDB GO-CC        : The maximum average silhouette width was 0.28 for k = 40
+# MSigDB GO-MF        : The maximum average silhouette width was 0.33 for k = 50
+# MSigDB BioCarta     : The maximum average silhouette width was 0.20 for k = 50
+# KEGG                : The maximum average silhouette width was 0.15 for k = 2
 
 # Wrapping the text of terms with too many characters in their description
 wrapped_pathfindR_outputs_HMBA72h_vs_HMBA24h = pathfindR_outputs_HMBA72h_vs_HMBA24h
@@ -1921,7 +1921,7 @@ pathfindR_outputs_HMBA72h_vs_HMBA48h = list()
 RNGversion("4.2.2")
 set.seed(123)
 for (i in 1:length(dirs_HMBA72h_vs_HMBA48h)){
-  pathfindR_outputs_HMBA72h_vs_HMBA48h[[i]] = run_pathfindR(pathf_input_HMBA72h_vs_HMBA48h, ggene_sets = "Custom",
+  pathfindR_outputs_HMBA72h_vs_HMBA48h[[i]] = run_pathfindR(pathf_input_HMBA72h_vs_HMBA48h, gene_sets = "Custom",
                                                             p_val_threshold = 0.05, convert2alias = FALSE,
                                                             custom_genes = genes_of_gene_sets[[i]],
                                                             custom_descriptions = descriptions_of_gene_sets[[i]],
@@ -1948,13 +1948,13 @@ for (i in 1:length(cluster_names)){
 }
 names(clustered_results_HMBA72h_vs_HMBA48h) = cluster_names
 
-# MSigDB Reactome     : The maximum average silhouette width was 0.35 for k = 100
-# MSigDB WikiPathways : The maximum average silhouette width was 0.12 for k = 90
-# MSigDB GO-BP        : The maximum average silhouette width was 0.12 for k = 150 
-# MSigDB GO-CC        : The maximum average silhouette width was 0.11 for k = 150
-# MSigDB GO-MF        : The maximum average silhouette width was 0.12 for k = 80
-# MSigDB BioCarta     : The maximum average silhouette width was 0.4 for k = 550
-# KEGG                : The maximum average silhouette width was 0.4 for k = 550
+# MSigDB Reactome     : The maximum average silhouette width was 0.35 for k = 250
+# MSigDB WikiPathways : The maximum average silhouette width was 0.14 for k = 150
+# MSigDB GO-BP        : The maximum average silhouette width was 0.41 for k = 550 
+# MSigDB GO-CC        : The maximum average silhouette width was 0.3 for k = 80
+# MSigDB GO-MF        : The maximum average silhouette width was 0.35 for k = 80
+# MSigDB BioCarta     : The maximum average silhouette width was 0.23 for k = 30
+# KEGG                : The maximum average silhouette width was 0.13 for k = 5
 
 # Wrapping the text of terms with too many characters in their description
 wrapped_pathfindR_outputs_HMBA72h_vs_HMBA48h = pathfindR_outputs_HMBA72h_vs_HMBA48h
