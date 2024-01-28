@@ -105,8 +105,8 @@ latest_mus_musculus = query(ah, c("EnsDb", "Mus musculus"))
 # Print the latest version
 tail(latest_mus_musculus)
 
-# ID of interest is "AH109650"
-edb = ah[["AH109650"]]
+# ID of interest is "AH109655" - Date: 28/01/2024
+edb = ah[["AH109655"]]
 
 # Get gene data
 genes_data = genes(edb)
@@ -132,15 +132,19 @@ mapped = transcript_lengths[transcript_lengths$Gene.Symbol %in%
                               x_filt$genes$Gene.Symbol,]
 mapped_lengths = mapped$transcript_length_kb # length in kilobases
 
-# Calculate counts per kilobase (CPK)
-cpk = x_filt$counts[mapped$Gene.Symbol, ] / mapped_lengths
+
+# Calculate reads per kilobase RPK - divide the counts by transcript length in kB
+rpk = x_filt$counts[mapped$Gene.Symbol, ] / (mapped_lengths / 1000)
 # Calculate the sum of CPK values for each sample
-cpk_sum = colSums(cpk)
+rpk_sum = colSums(rpk)
 
 # Calculate TPM values
-tpm = cpk / (cpk_sum / 1e6)
- log2tpm = log2(tpm + 1)
-rm(cpk, cpk_sum, keep.exprs, mapped_lengths, ah, edb)
+tpm = apply(rpk, 2,
+            function (x) x / (sum(as.numeric(x)) / 10^6))
+tpm_sum = colSums(tpm)
+
+log2tpm = log2(tpm + 1)
+rm(rpk, rpk_sum, tpm_sum, keep.exprs, mapped_lengths, ah, edb)
 
 removals = c(which(x_filt$genes$Gene.Symbol == "no_feature"),
              which(x_filt$genes$Gene.Symbol == "ambiguous"))
