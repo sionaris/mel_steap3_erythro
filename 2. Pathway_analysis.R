@@ -1180,13 +1180,13 @@ for (i in 1:length(cluster_names)){
 }
 names(clustered_results_HMBA48h_vs_HMBA24h) = cluster_names
 
-# MSigDB Reactome     : The maximum average silhouette width was 0.35 for k = 100
-# MSigDB WikiPathways : The maximum average silhouette width was 0.12 for k = 90
-# MSigDB GO-BP        : The maximum average silhouette width was 0.12 for k = 150 
-# MSigDB GO-CC        : The maximum average silhouette width was 0.11 for k = 150
-# MSigDB GO-MF        : The maximum average silhouette width was 0.12 for k = 80
-# MSigDB BioCarta     : The maximum average silhouette width was 0.4 for k = 550
-# KEGG                : The maximum average silhouette width was 0.4 for k = 550
+# MSigDB Reactome     : The maximum average silhouette width was 0.38 for k = 150
+# MSigDB WikiPathways : The maximum average silhouette width was 0.17 for k = 100
+# MSigDB GO-BP        : The maximum average silhouette width was 0.41 for k = 450 
+# MSigDB GO-CC        : The maximum average silhouette width was 0.42 for k = 40
+# MSigDB GO-MF        : The maximum average silhouette width was 0.32 for k = 50
+# MSigDB BioCarta     : The maximum average silhouette width was 0.32 for k = 30
+# KEGG                : The maximum average silhouette width was 0.13 for k = 90
 
 # Wrapping the text of terms with too many characters in their description
 wrapped_pathfindR_outputs_HMBA48h_vs_HMBA24h = pathfindR_outputs_HMBA48h_vs_HMBA24h
@@ -1438,11 +1438,11 @@ names(clustered_results_HMBA72h_vs_Control48h) = cluster_names
 
 # MSigDB Reactome     : The maximum average silhouette width was 0.35 for k = 100
 # MSigDB WikiPathways : The maximum average silhouette width was 0.12 for k = 90
-# MSigDB GO-BP        : The maximum average silhouette width was 0.12 for k = 150 
-# MSigDB GO-CC        : The maximum average silhouette width was 0.11 for k = 150
-# MSigDB GO-MF        : The maximum average silhouette width was 0.12 for k = 80
-# MSigDB BioCarta     : The maximum average silhouette width was 0.4 for k = 550
-# KEGG                : The maximum average silhouette width was 0.4 for k = 550
+# MSigDB GO-BP        : The maximum average silhouette width was 0.39 for k = 450 
+# MSigDB GO-CC        : The maximum average silhouette width was 0.32 for k = 40
+# MSigDB GO-MF        : The maximum average silhouette width was 0.29 for k = 50
+# MSigDB BioCarta     : The maximum average silhouette width was 0.17 for k = 50
+# KEGG                : The maximum average silhouette width was 0.14 for k = 2
 
 # Wrapping the text of terms with too many characters in their description
 wrapped_pathfindR_outputs_HMBA72h_vs_Control48h = pathfindR_outputs_HMBA72h_vs_Control48h
