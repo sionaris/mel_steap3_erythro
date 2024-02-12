@@ -412,10 +412,12 @@ for (i in 1:length(ashr_dgea)) {
   
   # Export the workbooks
   saveWorkbook(ora_wb_list[[i]], paste0("Pathways/", names(ashr_dgea)[i],
-                                        "/ORA/ORA_output_", names(ashr_dgea)[i]),
+                                        "/ORA/ORA_output_", names(ashr_dgea)[i],
+                                        ".xlsx"),
                overwrite = TRUE)
   saveWorkbook(gsea_wb_list[[i]], paste0("Pathways/", names(ashr_dgea)[i],
-                                        "/GSEA/GSEA_output_", names(ashr_dgea)[i]),
+                                        "/GSEA/GSEA_output_", names(ashr_dgea)[i],
+                                        ".xlsx"),
                overwrite = TRUE)
   
   # Keep track of the loop's progress
