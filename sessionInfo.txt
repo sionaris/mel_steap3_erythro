@@ -1,0 +1,67 @@
+R version 4.4.0 (2024-04-24 ucrt)
+Platform: x86_64-w64-mingw32/x64
+Running under: Windows 11 x64 (build 26100)
+
+Matrix products: default
+
+
+locale:
+[1] LC_COLLATE=English_United Kingdom.utf8  LC_CTYPE=English_United Kingdom.utf8   
+[3] LC_MONETARY=English_United Kingdom.utf8 LC_NUMERIC=C                           
+[5] LC_TIME=English_United Kingdom.utf8    
+
+time zone: Europe/London
+tzcode source: internal
+
+attached base packages:
+[1] grid      stats4    stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+ [1] genefilter_1.86.0           EnhancedVolcano_1.22.0      openxlsx_4.2.5.2           
+ [4] glmpca_0.2.0                ggrepel_0.9.5               PoiClaClu_1.0.2.1          
+ [7] tibble_3.2.1                RColorBrewer_1.1-3          rcartocolor_2.1.1          
+[10] pheatmap_1.0.12             cowplot_1.1.3               ggpubr_0.6.0               
+[13] vsn_3.72.0                  tidyr_1.3.1                 ggplot2_3.5.1              
+[16] ensembldb_2.28.1            AnnotationFilter_1.28.0     GenomicFeatures_1.56.0     
+[19] AnnotationHub_3.12.0        BiocFileCache_2.12.0        org.Mm.eg.db_3.19.1        
+[22] AnnotationDbi_1.66.0        edgeR_4.2.0                 limma_3.60.0               
+[25] DESeq2_1.44.0               SummarizedExperiment_1.34.0 Biobase_2.64.0             
+[28] MatrixGenerics_1.16.0       matrixStats_1.3.0           GenomicRanges_1.56.0       
+[31] GenomeInfoDb_1.40.0         IRanges_2.38.0              S4Vectors_0.42.0           
+[34] BiocGenerics_0.50.0         dplyr_1.1.4                 dbplyr_2.5.0               
+
+loaded via a namespace (and not attached):
+  [1] rstudioapi_0.16.0        jsonlite_1.8.8           magrittr_2.0.3          
+  [4] farver_2.1.2             BiocIO_1.14.0            zlibbioc_1.50.0         
+  [7] ragg_1.3.2               vctrs_0.6.5              memoise_2.0.1           
+ [10] Rsamtools_2.20.0         RCurl_1.98-1.16          SQUAREM_2021.1          
+ [13] mixsqp_0.3-54            rstatix_0.7.2            S4Arrays_1.4.0          
+ [16] curl_5.2.1               truncnorm_1.0-9          rsthemes_0.5.0          
+ [19] broom_1.0.6              SparseArray_1.4.3        cachem_1.1.0            
+ [22] GenomicAlignments_1.40.0 mime_0.12                lifecycle_1.0.4         
+ [25] pkgconfig_2.0.3          Matrix_1.7-0             R6_2.5.1                
+ [28] fastmap_1.2.0            GenomeInfoDbData_1.2.12  colorspace_2.1-0        
+ [31] irlba_2.3.5.1            textshaping_0.3.7        RSQLite_2.3.6           
+ [34] invgamma_1.1             filelock_1.0.3           labeling_0.4.3          
+ [37] fansi_1.0.6              httr_1.4.7               abind_1.4-5             
+ [40] compiler_4.4.0           bit64_4.0.5              withr_3.0.1             
+ [43] backports_1.4.1          BiocParallel_1.38.0      carData_3.0-5           
+ [46] DBI_1.2.3                hexbin_1.28.3            ggsignif_0.6.4          
+ [49] MASS_7.3-60.2            rappdirs_0.3.3           DelayedArray_0.30.1     
+ [52] rjson_0.2.21             tools_4.4.0              zip_2.3.1               
+ [55] glue_1.7.0               restfulr_0.0.15          generics_0.1.3          
+ [58] gtable_0.3.5             preprocessCore_1.66.0    car_3.1-2               
+ [61] utf8_1.2.4               XVector_0.44.0           BiocVersion_3.19.1      
+ [64] pillar_1.9.0             splines_4.4.0            lattice_0.22-6          
+ [67] survival_3.5-8           rtracklayer_1.64.0       bit_4.0.5               
+ [70] annotate_1.82.0          tidyselect_1.2.1         locfit_1.5-9.9          
+ [73] Biostrings_2.72.0        gridExtra_2.3            ProtGenerics_1.36.0     
+ [76] statmod_1.5.0            stringi_1.8.4            UCSC.utils_1.0.0        
+ [79] lazyeval_0.2.2           yaml_2.3.8               codetools_0.2-20        
+ [82] BiocManager_1.30.24      cli_3.6.2                affyio_1.74.0           
+ [85] xtable_1.8-4             systemfonts_1.1.0        munsell_0.5.1           
+ [88] Rcpp_1.0.12              png_0.1-8                XML_3.99-0.16.1         
+ [91] parallel_4.4.0           blob_1.2.4               bitops_1.0-7            
+ [94] viridisLite_0.4.2        scales_1.3.0             affy_1.82.0             
+ [97] purrr_1.0.2              crayon_1.5.3             rlang_1.1.3             
+[100] ashr_2.2-63              KEGGREST_1.44.1         

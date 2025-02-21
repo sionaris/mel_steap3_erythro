@@ -1148,5 +1148,5 @@ rm(genes, i, res, topDEGs, matcount, matcount_ordered, DEGgenesPoisDistMatrix,
 
 gc()
 
-# Session info
-sessionInfo()
+# Export session info
+writeLines(capture.output(sessionInfo()), "sessionInfo.txt")
