@@ -406,6 +406,7 @@ if (!dir.exists("MEL_exploratory_plots/Dimensionality_reduction_plots")) {
 
 # Principal Component Analysis
 library(ggrepel)
+library(patchwork)
 pcaData = plotPCA(vsd, intgroup = c("treatment", "batch"), 
                   returnData=TRUE) %>%
   dplyr::rename(Sample.ID = name)
@@ -446,7 +447,9 @@ pcaplot = ggplot(pcaData, aes(PC1, PC2, color = treatment, shape = batch)) +
 library(glmpca)
 RNGversion("4.2.2")
 set.seed(123)
-gpca = glmpca(counts(dds), L=2)
+gpca = glmpca(counts(dds), L=2, fam = "nb", minibatch = "none",
+              optimizer = "fisher",
+              ctl = list(maxIter = 10000, tol = 1e-6))
 gpca.dat = gpca$factors
 gpca.dat$treatment = dds$treatment
 gpca.dat$batch = dds$batch
@@ -1147,6 +1150,41 @@ rm(genes, i, res, topDEGs, matcount, matcount_ordered, DEGgenesPoisDistMatrix,
    logmat_znorm, sample_order, genes_order, gaps_col)
 
 gc()
+
+# Ferroptosis heatmaps #####
+ctrl_name = "Control" # OR "Cells_T0"
+inducers = c("PBCP1", "SLC3A2", "NRF2", "FLVCR1", "SLC7A5", "GPX4", "DHODH",
+             "DHFR", "SLC40A1", "GCH1", "SLC7A11", "FSP1")
+repressors = c("PBCP2", "CHMP5", "ALOX5", "DMT1", "TXNIP", "POR", "LPACT3",
+               "ASCL4", "ATF3", "TFRC")
+sample_categories = c(ctrl_name, "Cells_T24", "Cells_T48", "Cells_T72")
+
+# Create heatmap matrix
+# Here we use normalized counts after log2(counts + 1) transform and z-standardization
+heatmap_matrix = counts(dds, normalized = TRUE)
+tiff(paste0("DGEA/Post_DGEA_heatmaps/ashr_shrunk/",
+            names(ashr_shrunk_results)[i], "_DEG_samples_ordered.tiff"),
+     res = 700, width = 7260, 
+     height = 5760, compression = "lzw")
+pheatmap(logmat_ordered_znorm, annotation_col = anno,
+         breaks = seq(-4, 4, 8/length(colors2)),
+         annotation_colors = ann_colors,
+         cluster_rows = FALSE,
+         cluster_cols = FALSE,
+         col = colors2,
+         gaps_row = gaps_row,
+         gaps_col = gaps_col,
+         cutree_cols = 2,
+         fontsize = 8,
+         fontsize_row = 8,
+         fontsize_col = 6,
+         border_color = "grey60",
+         main = paste0(names(ashr_shrunk_results)[i], 
+                       " - DEGs vs. samples heatmap (ordered)"),
+         legend_breaks = c(-4, 4),
+         legend_labels = c("lower expression", "higher expression"))
+dev.off()
+
 
 # Export session info
 writeLines(capture.output(sessionInfo()), "sessionInfo.txt")
