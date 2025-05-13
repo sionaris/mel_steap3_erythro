@@ -8,6 +8,8 @@ library(clusterProfiler)
 library(openxlsx)
 library(org.Mm.eg.db)
 library(ReactomePA)
+library(biomaRt)
+library(MPO.db)
 
 # Import data (6 lists from DGEA)
 ashr_dgea = list()
@@ -81,19 +83,19 @@ for (i in 1:length(ashr_dgea)) {
   sig_genes = ashr_dgea[[i]]$padj < 0.05
   
   # Extract the log2 fold changes and gene names of the significant genes
-  log2fc = ashr_dgea[[i]]$log2FoldChange[sig_genes]
-  genes = ashr_dgea[[i]]$Gene.Symbol[sig_genes]
+  log2fc = ashr_dgea[[i]]$log2FoldChange
+  genes = ashr_dgea[[i]]$Gene.Symbol
   gene_list = log2fc
   names(gene_list) = genes
   rm(log2fc, genes)
   gene_list = sort(gene_list, decreasing = TRUE) # symbols
   gene_list_conv = suppressWarnings(bitr(names(gene_list), fromType = "SYMBOL",
-                          toType = "ENTREZID", OrgDb = org.Mm.eg.db))
+                                         toType = "ENTREZID", OrgDb = "org.Mm.eg.db"))
   gene_list_entrez = gene_list
   names(gene_list_entrez) = as.character(gene_list_conv$ENTREZID)
   gene_list_entrez = sort(gene_list_entrez, decreasing = TRUE) # Entrez ids
   entrez_universe = suppressWarnings(bitr(ashr_dgea[[i]]$Gene.Symbol, fromType = "SYMBOL",
-                                          toType = "ENTREZID", OrgDb = org.Mm.eg.db))$ENTREZID
+                                          toType = "ENTREZID", OrgDb = "org.Mm.eg.db"))$ENTREZID
   
   # Gene Set Enrichment Analysis (GSEA) #####
   
@@ -104,14 +106,14 @@ for (i in 1:length(ashr_dgea)) {
   RNGversion("4.2.2")
   set.seed(123)
   gseaGO = suppressWarnings(gseGO(geneList = gene_list,
-                 ont = "ALL",
-                 OrgDb = "org.Mm.eg.db",
-                 keyType = "SYMBOL",
-                 pvalueCutoff = 0.05,
-                 pAdjustMethod = "BH",
-                 minGSSize = 3,
-                 maxGSSize = 800,
-                 seed = TRUE))
+                                  ont = "ALL",
+                                  OrgDb = "org.Mm.eg.db",
+                                  keyType = "SYMBOL",
+                                  pvalueCutoff = 0.05,
+                                  pAdjustMethod = "BH",
+                                  minGSSize = 3,
+                                  maxGSSize = 800,
+                                  seed = TRUE))
   
   if (exists("gseaGO")) {
     if (nrow(gseaGO) > 0) {
@@ -127,13 +129,13 @@ for (i in 1:length(ashr_dgea)) {
   RNGversion("4.2.2")
   set.seed(123)
   gseaKEGG = suppressWarnings(gseKEGG(geneList = gene_list_entrez,
-                     organism = "mmu",
-                     keyType = "ncbi-geneid",
-                     pvalueCutoff = 0.05,
-                     pAdjustMethod = "BH",
-                     minGSSize = 3,
-                     maxGSSize = 800,
-                     seed = TRUE))
+                                      organism = "mmu",
+                                      keyType = "ncbi-geneid",
+                                      pvalueCutoff = 0.05,
+                                      pAdjustMethod = "BH",
+                                      minGSSize = 3,
+                                      maxGSSize = 800,
+                                      seed = TRUE))
   
   if (exists("gseaKEGG")) {
     if (nrow(gseaKEGG) > 0) {
@@ -149,12 +151,12 @@ for (i in 1:length(ashr_dgea)) {
   RNGversion("4.2.2")
   set.seed(123)
   gseaReactome = suppressWarnings(gsePathway(geneList = gene_list_entrez,
-                            organism = "mouse",
-                            pvalueCutoff = 0.05,
-                            pAdjustMethod = "BH",
-                            minGSSize = 3,
-                            maxGSSize = 800,
-                            seed = TRUE))
+                                             organism = "mouse",
+                                             pvalueCutoff = 0.05,
+                                             pAdjustMethod = "BH",
+                                             minGSSize = 3,
+                                             maxGSSize = 800,
+                                             seed = TRUE))
   
   if (exists("gseaReactome")) {
     if (nrow(gseaReactome) > 0) {
@@ -171,12 +173,12 @@ for (i in 1:length(ashr_dgea)) {
   RNGversion("4.2.2")
   set.seed(123)
   gseaWP = suppressWarnings(gseWP(geneList = gene_list_entrez,
-                 organism = "Mus musculus",
-                 pvalueCutoff = 0.05,
-                 pAdjustMethod = "BH",
-                 minGSSize = 3,
-                 maxGSSize = 800,
-                 seed = TRUE))
+                                  organism = "Mus musculus",
+                                  pvalueCutoff = 0.05,
+                                  pAdjustMethod = "BH",
+                                  minGSSize = 3,
+                                  maxGSSize = 800,
+                                  seed = TRUE))
   
   if (exists("gseaWP")) {
     if (nrow(gseaWP) > 0) {
@@ -193,11 +195,12 @@ for (i in 1:length(ashr_dgea)) {
   RNGversion("4.2.2")
   set.seed(123)
   gseaDO = suppressWarnings(DOSE::gseDO(geneList = gene_list_entrez,
-                       pvalueCutoff = 0.05,
-                       pAdjustMethod = "BH",
-                       minGSSize = 3,
-                       maxGSSize = 800,
-                       seed = TRUE))
+                                        pvalueCutoff = 0.05,
+                                        pAdjustMethod = "BH",
+                                        organism = "mmu",
+                                        minGSSize = 3,
+                                        maxGSSize = 800,
+                                        seed = TRUE))
   
   if (exists("gseaDO")) {
     if (nrow(gseaDO) > 0) {
@@ -210,8 +213,10 @@ for (i in 1:length(ashr_dgea)) {
     }
   }
   
-  # DO in the Network Cancer Gene
-  # http://ncg.kcl.ac.uk/
+  # The following to GSE analyses are for human genes only
+  
+  # # DO in the Network Cancer Gene
+  # # http://ncg.kcl.ac.uk/
   # RNGversion("4.2.2")
   # set.seed(123)
   # gseaNCG = suppressWarnings(DOSE::gseNCG(geneList = gene_list_entrez,
@@ -220,20 +225,20 @@ for (i in 1:length(ashr_dgea)) {
   #                       minGSSize = 3,
   #                       maxGSSize = 800,
   #                       seed = TRUE))
-  #
+  # 
   # if (exists("gseaNCG")) {
   #  if (nrow(gseaNCG) > 0) {
   #    gseaNCG = clusterProfiler::setReadable(gseaNCG, 'org.Mm.eg.db',
   #                                           keyType = "ENTREZID")
   #    gsea_output[["Network Cancer Gene (NCG)"]] = gseaNCG@result
-  #    
+  # 
   #    addWorksheet(gsea_wb_list[[i]], "GSEA_NCG")
   #    writeData(gsea_wb_list[[i]], "GSEA_NCG", as.data.frame(gseaNCG@result))
   #  }
-  #}
-  
-  # DO in the Disease Gene Network (DisGeNET)
-  # http://disgenet.org/
+  # }
+  # 
+  # # DO in the Disease Gene Network (DisGeNET)
+  # # http://disgenet.org/
   # RNGversion("4.2.2")
   # set.seed(123)
   # gseaDGN = suppressWarnings(DOSE::gseDGN(geneList = gene_list_entrez,
@@ -241,14 +246,13 @@ for (i in 1:length(ashr_dgea)) {
   #                       pAdjustMethod = "BH",
   #                       minGSSize = 3,
   #                       maxGSSize = 800,
-  #                       seed = TRUE))
-  
+  #                      seed = TRUE))
+  # 
   # if (exists("gseaDGN")) {
   #  if (nrow(gseaDGN) > 0) {
   #    gseaDGN = clusterProfiler::setReadable(gseaDGN, 'org.Mm.eg.db',
   #                                           keyType = "ENTREZID")
   #    gsea_output[["Disease Gene Network (DisGeNET)"]] = gseaDGN@result
-  #    
   #    addWorksheet(gsea_wb_list[[i]], "GSEA_DGN")
   #    writeData(gsea_wb_list[[i]], "GSEA_DGN", as.data.frame(gseaDGN@result))
   #  }
@@ -258,21 +262,29 @@ for (i in 1:length(ashr_dgea)) {
   
   # Over-representation analysis (ORA) #####
   
+  # Define the cutoff for significant genes
+  sig_genes = ashr_dgea[[i]]$padj < 0.05
+  
+  # Extract the log2 fold changes and gene names of the significant genes
+  gene_list = ashr_dgea[[i]]$Gene.Symbol[sig_genes]
+  gene_list_entrez = suppressWarnings(bitr(gene_list, fromType = "SYMBOL",
+                                           toType = "ENTREZID", OrgDb = "org.Mm.eg.db"))$ENTREZID
+  
   # ORA temporary list
   ora_output = list()
   
   # GO
-  oraGO = suppressWarnings(enrichGO(gene = names(gene_list),
-                   ont = "ALL",
-                   universe = ashr_dgea[[i]]$Gene.Symbol,
-                   OrgDb = "org.Mm.eg.db",
-                   keyType = "SYMBOL",
-                   pvalueCutoff = 0.05,
-                   qvalueCutoff = 0.1,
-                   pAdjustMethod = "BH",
-                   minGSSize = 3,
-                   maxGSSize = 800,
-                   pool = TRUE))
+  oraGO = suppressWarnings(enrichGO(gene = gene_list,
+                                    ont = "ALL",
+                                    universe = ashr_dgea[[i]]$Gene.Symbol,
+                                    OrgDb = "org.Mm.eg.db",
+                                    keyType = "SYMBOL",
+                                    pvalueCutoff = 0.05,
+                                    qvalueCutoff = 0.1,
+                                    pAdjustMethod = "BH",
+                                    minGSSize = 3,
+                                    maxGSSize = 800,
+                                    pool = TRUE))
   
   if (exists("oraGO")) {
     if (nrow(oraGO) > 0) {
@@ -285,15 +297,15 @@ for (i in 1:length(ashr_dgea)) {
   }
   
   # KEGG
-  oraKEGG = suppressWarnings(enrichKEGG(gene = names(gene_list_entrez),
-                       universe = entrez_universe,
-                       organism = "mmu",
-                       keyType = "ncbi-geneid",
-                       pvalueCutoff = 0.05,
-                       qvalueCutoff = 0.1,
-                       pAdjustMethod = "BH",
-                       minGSSize = 3,
-                       maxGSSize = 800))
+  oraKEGG = suppressWarnings(enrichKEGG(gene = gene_list_entrez,
+                                        universe = entrez_universe,
+                                        organism = "mmu",
+                                        keyType = "ncbi-geneid",
+                                        pvalueCutoff = 0.05,
+                                        qvalueCutoff = 0.1,
+                                        pAdjustMethod = "BH",
+                                        minGSSize = 3,
+                                        maxGSSize = 800))
   
   if (exists("oraKEGG")) {
     if (nrow(oraKEGG) > 0) {
@@ -307,14 +319,14 @@ for (i in 1:length(ashr_dgea)) {
   }
   
   # WikiPathways
-  oraWP = suppressWarnings(enrichWP(gene = names(gene_list_entrez),
-                   universe = entrez_universe,
-                   organism = "Mus musculus",
-                   pvalueCutoff = 0.05,
-                   qvalueCutoff = 0.1,
-                   pAdjustMethod = "BH",
-                   minGSSize = 3,
-                   maxGSSize = 800))
+  oraWP = suppressWarnings(enrichWP(gene = gene_list_entrez,
+                                    universe = entrez_universe,
+                                    organism = "Mus musculus",
+                                    pvalueCutoff = 0.05,
+                                    qvalueCutoff = 0.1,
+                                    pAdjustMethod = "BH",
+                                    minGSSize = 3,
+                                    maxGSSize = 800))
   
   if (exists("oraWP")) {
     if (nrow(oraWP) > 0) {
@@ -328,15 +340,15 @@ for (i in 1:length(ashr_dgea)) {
   }
   
   # Reactome
-  oraReactome = suppressWarnings(enrichPathway(gene = names(gene_list_entrez),
-                              universe = entrez_universe,
-                              organism = "mouse",
-                              pvalueCutoff = 0.05,
-                              qvalueCutoff = 0.1,
-                              pAdjustMethod = "BH",
-                              minGSSize = 3,
-                              maxGSSize = 800,
-                              readable = TRUE))
+  oraReactome = suppressWarnings(enrichPathway(gene = gene_list_entrez,
+                                               universe = entrez_universe,
+                                               organism = "mouse",
+                                               pvalueCutoff = 0.05,
+                                               qvalueCutoff = 0.1,
+                                               pAdjustMethod = "BH",
+                                               minGSSize = 3,
+                                               maxGSSize = 800,
+                                               readable = TRUE))
   
   if (exists("oraReactome")) {
     if (nrow(oraReactome) > 0) {
@@ -348,28 +360,31 @@ for (i in 1:length(ashr_dgea)) {
     }
   }
   
-  # DO
-  # oraDO = suppressWarnings(DOSE::enrichDO(gene = names(gene_list_entrez),
+  # # DO - Persistent ID errors
+  # oraDO = suppressWarnings(DOSE::enrichDO(gene = names(geneList),
   #                       universe = entrez_universe,
+  #                       organism = "mmu",
   #                       pvalueCutoff = 0.05,
   #                       qvalueCutoff = 0.1,
   #                       pAdjustMethod = "BH",
   #                       minGSSize = 3,
   #                       maxGSSize = 800,
   #                       readable = TRUE))
-  
-  #if (exists("oraDO")) {
+  # 
+  # if (exists("oraDO")) {
   #  if (nrow(oraDO) > 0) {
   #    oraDO_q0.1 = oraDO@result %>% dplyr::filter(qvalue <= 0.1)
   #    ora_output[["Disease Ontology"]] = oraDO@result
-  #    
+  # 
   #    addWorksheet(ora_wb_list[[i]], "ORA_DO")
   #    writeData(ora_wb_list[[i]], "ORA_DO", as.data.frame(oraDO_q0.1))
   #  }
-  #}
+  # }
   
-  # DO: NCG
-  #oraNCG = suppressWarnings(DOSE::enrichNCG(gene = names(gene_list_entrez),
+  # The following two OR analyses are for human genes only
+  
+  # # DO: NCG
+  # oraNCG = suppressWarnings(DOSE::enrichNCG(gene = gene_list_entrez,
   #                         universe = entrez_universe,
   #                         pvalueCutoff = 0.05,
   #                         qvalueCutoff = 0.1,
@@ -377,19 +392,19 @@ for (i in 1:length(ashr_dgea)) {
   #                         minGSSize = 3,
   #                         maxGSSize = 800,
   #                         readable = TRUE))
-#  
-#  if (exists("oraNCG")) {
-#    if (nrow(oraNCG) > 0) {
-#      oraNCG_q0.1 = oraNCG@result %>% dplyr::filter(qvalue <= 0.1)
-#      ora_output[["Network Cancer Gene (NCG)"]] = oraNCG@result
-#      
-#      addWorksheet(ora_wb_list[[i]], "ORA_NCG")
-#      writeData(ora_wb_list[[i]], "ORA_NCG", as.data.frame(oraNCG_q0.1))
-#    }
-#  }
-  
-  # DO: DGN
-  #oraDGN = suppressWarnings(DOSE::enrichDGN(gene = names(gene_list_entrez),
+  # 
+  #  if (exists("oraNCG")) {
+  #    if (nrow(oraNCG) > 0) {
+  #      oraNCG_q0.1 = oraNCG@result %>% dplyr::filter(qvalue <= 0.1)
+  #      ora_output[["Network Cancer Gene (NCG)"]] = oraNCG@result
+  # 
+  #      addWorksheet(ora_wb_list[[i]], "ORA_NCG")
+  #      writeData(ora_wb_list[[i]], "ORA_NCG", as.data.frame(oraNCG_q0.1))
+  #    }
+  #  }
+  # 
+  # # DO: DGN
+  # oraDGN = suppressWarnings(DOSE::enrichDGN(gene = names(gene_list_entrez),
   #                         universe = entrez_universe,
   #                         pvalueCutoff = 0.05,
   #                         qvalueCutoff = 0.1,
@@ -397,16 +412,16 @@ for (i in 1:length(ashr_dgea)) {
   #                         minGSSize = 3,
   #                         maxGSSize = 800,
   #                         readable = TRUE))
-#  
-  #if (exists("oraDGN")) {
+  # 
+  # if (exists("oraDGN")) {
   #  if (nrow(oraDGN) > 0) {
   #    oraDGN_q0.1 = oraDGN@result %>% dplyr::filter(qvalue <= 0.1)
   #    ora_output[["Disease Gene Network (DisGeNET)"]] = oraDGN@result
-  #    
+  # 
   #    addWorksheet(ora_wb_list[[i]], "ORA_DGN")
   #    writeData(ora_wb_list[[i]], "ORA_DGN", as.data.frame(oraDGN_q0.1))
   #  }
-  #}
+  # }
   
   ora_results[[i]] = ora_output
   
@@ -416,14 +431,14 @@ for (i in 1:length(ashr_dgea)) {
                                         ".xlsx"),
                overwrite = TRUE)
   saveWorkbook(gsea_wb_list[[i]], paste0("Pathways/", names(ashr_dgea)[i],
-                                        "/GSEA/GSEA_output_", names(ashr_dgea)[i],
-                                        ".xlsx"),
+                                         "/GSEA/GSEA_output_", names(ashr_dgea)[i],
+                                         ".xlsx"),
                overwrite = TRUE)
   
   # Keep track of the loop's progress
   cat(paste("Done with", names(ashr_dgea)[i], "\n"))
   
-  # Remove garbage
+  # Remove temporary objects
   rm(list=setdiff(ls(), keepers))
 }
 
