@@ -1153,38 +1153,126 @@ gc()
 
 # Ferroptosis heatmaps #####
 ctrl_name = "Control" # OR "Cells_T0"
-inducers = c("PBCP1", "SLC3A2", "NRF2", "FLVCR1", "SLC7A5", "GPX4", "DHODH",
-             "DHFR", "SLC40A1", "GCH1", "SLC7A11", "FSP1")
-repressors = c("PBCP2", "CHMP5", "ALOX5", "DMT1", "TXNIP", "POR", "LPACT3",
-               "ASCL4", "ATF3", "TFRC")
-sample_categories = c(ctrl_name, "Cells_T24", "Cells_T48", "Cells_T72")
+repressors = c("Pcbp1", "Slc3a2", "Nfe2l2", "Flvcr1", "Slc7a5", "Gpx4", "Dhodh",
+             "Dhfr", "Slc40a1", "Gch1", "Slc7a11", "Aifm2")
+activators = c("Pcbp2", "Chmp5", "Alox5", "Slc11a2", "Txnip", "Por", "Lpcat3",
+              "Atf3", "Tfrc") # Ascl4 would be included but only had 0 counts
 
-# Create heatmap matrix
+# Create annotation object
+anno_df = anno %>% mutate(`Sample group` = ifelse(treatment == "control",
+                                                  ctrl_name, paste0("Cells_", timepoint))) %>%
+  dplyr::filter(!(treatment == "control" & timepoint != "48h")) %>% # keep only controls of 48h
+  dplyr::select(`Sample group`, Treatment = treatment, -batch)
+anno_df = anno_df[c("2023_CONTROL-1", "2023_CONTROL-3", "AUTH_MEL-CON-48h",
+                    "2023_24h-HMBA-1", "2023_24h-HMBA-2", "AUTH_MEL-HMBA-TR-24h",
+                    "2023_48h-HMBA-2", "2023_48h-HMBA-3", "AUTH_MEL-HMBA-TR-48h",
+                    "2023_72h-HMBA-1", "2023_72h-HMBA-2", "AUTH_MEL-HMBA-TR-72h"), ]
+
+# Create heatmap matrices
+activators_matrix = counts(dds, normalized = TRUE)[activators, ]
+repressors_matrix = counts(dds, normalized = TRUE)[repressors, ]
+
 # Here we use normalized counts after log2(counts + 1) transform and z-standardization
-heatmap_matrix = counts(dds, normalized = TRUE)
-tiff(paste0("DGEA/Post_DGEA_heatmaps/ashr_shrunk/",
-            names(ashr_shrunk_results)[i], "_DEG_samples_ordered.tiff"),
-     res = 700, width = 7260, 
+activators_matrix = log2(activators_matrix + 1)
+repressors_matrix = log2(repressors_matrix + 1)
+
+# Scale the matrices (standardization of rows)
+activators_matrix = t(scale(t(activators_matrix), center = TRUE, scale = TRUE))
+repressors_matrix = t(scale(t(repressors_matrix), center = TRUE, scale = TRUE))
+
+# Exclude control samples from timepoints other than 48h
+activators_matrix = activators_matrix[, rownames(anno_df)]
+repressors_matrix = repressors_matrix[, rownames(anno_df)]
+
+# Create directory if not already there
+if (!dir.exists("DGEA/Post_DGEA_heatmaps/Ferroptosis")) {
+  dir.create("DGEA/Post_DGEA_heatmaps/Ferroptosis")
+}
+
+# Color scales for activators and repressors
+expression_palette = c(rev(carto_pal(n = 256, name = "BluYl")),
+                       carto_pal(n = 256, name = "BurgYl"))
+
+library(ComplexHeatmap)
+library(circlize)
+
+ha = HeatmapAnnotation(Group = anno_block(gp = gpar(fill = c(carto_pal(n = 7, name = "OrYel")[3],
+                                                             carto_pal(n = 7, name = "Purp")[1],
+                                                             carto_pal(n = 7, name = "Purp")[3],
+                                                             carto_pal(n = 7, name = "Purp")[5])),
+                                          labels_gp = gpar(fontsize = 13), 
+                                          labels = c(ctrl_name,
+                                                     "Cells 24h", "Cells 48h", "Cells 72h")))
+ht_activators = Heatmap(activators_matrix, name = "Standardized expression", top_annotation = ha,
+                      column_title = "Ferroptosis activators heatmap",
+                      heatmap_legend_param = list(direction = "horizontal", legend_width = unit(7, "cm"),
+                                                  title_position = "topcenter", at = seq(-4, 4, 1),
+                                                  title_gp = gpar(fontsize = 12, fontface = "bold")),
+                      column_title_gp = gpar(fontsize = 15, fontface = "bold"),
+                      col = expression_palette, 
+                      row_names_side = "right",
+                      cluster_rows = TRUE,
+                      column_split = c(rep(1, 3), rep(2, 3), rep(3, 3), rep(4, 3)),
+                      cluster_columns = FALSE, 
+                      show_row_names = TRUE, 
+                      row_names_gp = gpar(fontsize = 13, fontface = "bold"),
+                      show_column_names = FALSE,
+                      rect_gp = gpar(col = "black", lwd = 0.5))
+
+
+tiff("DGEA/Post_DGEA_heatmaps/Ferroptosis_activators_heatmap.tiff",
+     res = 700, width = 5760, 
      height = 5760, compression = "lzw")
-pheatmap(logmat_ordered_znorm, annotation_col = anno,
-         breaks = seq(-4, 4, 8/length(colors2)),
-         annotation_colors = ann_colors,
-         cluster_rows = FALSE,
-         cluster_cols = FALSE,
-         col = colors2,
-         gaps_row = gaps_row,
-         gaps_col = gaps_col,
-         cutree_cols = 2,
-         fontsize = 8,
-         fontsize_row = 8,
-         fontsize_col = 6,
-         border_color = "grey60",
-         main = paste0(names(ashr_shrunk_results)[i], 
-                       " - DEGs vs. samples heatmap (ordered)"),
-         legend_breaks = c(-4, 4),
-         legend_labels = c("lower expression", "higher expression"))
+draw(ht_activators, heatmap_legend_side = "bottom")
 dev.off()
 
+png("DGEA/Post_DGEA_heatmaps/Ferroptosis_activators_heatmap.png",
+    res = 700, width = 5760, 
+    height = 5760)
+draw(ht_activators, heatmap_legend_side = "bottom")
+dev.off()
+
+ht_repressors = Heatmap(repressors_matrix, name = "Standardized expression", top_annotation = ha,
+                        column_title = "Ferroptosis repressors heatmap",
+                        heatmap_legend_param = list(direction = "horizontal", legend_width = unit(7, "cm"),
+                                                    title_position = "topcenter", at = seq(-4, 4, 1),
+                                                    title_gp = gpar(fontsize = 12)),
+                        column_title_gp = gpar(fontsize = 15, fontface = "bold"),
+                        col = expression_palette, 
+                        row_names_side = "right",
+                        cluster_rows = TRUE,
+                        column_split = c(rep(1, 3), rep(2, 3), rep(3, 3), rep(4, 3)),
+                        cluster_columns = FALSE, 
+                        show_row_names = TRUE, 
+                        row_names_gp = gpar(fontsize = 13, fontface = "bold"),
+                        show_column_names = FALSE,
+                        rect_gp = gpar(col = "black", lwd = 0.5))
+
+
+tiff("DGEA/Post_DGEA_heatmaps/Ferroptosis_repressors_heatmap.tiff",
+     res = 700, width = 5760, 
+     height = 5760, compression = "lzw")
+draw(ht_repressors, heatmap_legend_side = "bottom")
+dev.off()
+
+png("DGEA/Post_DGEA_heatmaps/Ferroptosis_repressors_heatmap.png",
+     res = 700, width = 5760, 
+     height = 5760)
+draw(ht_repressors, heatmap_legend_side = "bottom")
+dev.off()
+
+# Proteomic comparison #####
+# proteomics = read.xlsx("Proteomics.xlsx", sheet = 2) %>%
+#   dplyr::filter(Gene.names %in% c(activators, repressors))
+# 
+# # Replace Non-numerique with NA
+# for (i in 1:nrow(proteomics)) {
+#   for (j in 1:ncol(proteomics)) {
+#     if (proteomics[i, j] == "Non Numérique") {
+#       proteomics[i, j] = NA
+#     }
+#   }
+# }
 
 # Export session info
-writeLines(capture.output(sessionInfo()), "sessionInfo.txt")
+writeLines(capture.output(sessionInfo()), "DGEA_sessionInfo.txt")
